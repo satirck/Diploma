@@ -4,20 +4,20 @@ public class Olc6502
 {
     private Bus? _bus;
 
-    private List<Instruction> _lookup;
+    private List<Instruction> _lookup = null!;
 
     public byte A = 0x00;
     public byte X = 0x00;
     public byte Y = 0x00;
     public byte Stkp = 0x00;
-    public byte Pc = 0x00;
+    public ushort Pc = 0x0000;
     public byte Status = 0x00;
     public byte Fetched = 0x00;
     public ushort AddrAbs = 0x0000;
     public ushort AddRel = 0x0000;
     public byte Opcode = 0x00;
     public byte Cycles = 0;
-    
+
     public void ConnectBus(Bus bus)
     {
         _bus = bus;
@@ -281,7 +281,7 @@ public class Olc6502
             new Instruction("???", Xxx, Imp, 7)
         };
     }
-    
+
     // Addressing Modes
     public byte Imp()
     {
@@ -297,79 +297,560 @@ public class Olc6502
 
     public byte Zp0()
     {
-        AddrAbs = Read(Pc);
+        AddrAbs = (ushort)(Read(Pc) & -0x00FF);
         Pc++;
-        AddrAbs &= 0x00FF;
         return 0;
     }
-    public byte Zpx() { return 0; }
-    public byte Zpy() { return 0; }
-    public byte Rel() { return 0; }
-    public byte Abs() { return 0; }
-    public byte Abx() { return 0; }
-    public byte Aby() { return 0; }
-    public byte Ind() { return 0; }
-    public byte Izx() { return 0; }
-    public byte Izy() { return 0; }
-    
+
+    public byte Zpx()
+    {
+        AddrAbs = (ushort)((Read(Pc) + X) & 0x00FF);
+        Pc++;
+        return 0;
+    }
+
+    public byte Zpy()
+    {
+        AddrAbs = (ushort)((Read(Pc) + Y) & 0x00FF);
+        Pc++;
+        return 0;
+    }
+
+    public byte Rel()
+    {
+        AddRel = Read(Pc);
+        Pc++;
+
+        if ((AddRel & 0x80) != 0)
+        {
+            AddRel |= 0xFF00;
+        }
+
+        return 0;
+    }
+
+    public byte Abs()
+    {
+        ushort lo = Read(Pc);
+        Pc++;
+        ushort hi = Read(Pc);
+        Pc++;
+
+        AddrAbs = (ushort)((hi << 8) | lo);
+
+        return 0;
+    }
+
+    public byte Abx()
+    {
+        ushort lo = Read(Pc);
+        Pc++;
+        ushort hi = Read(Pc);
+        Pc++;
+
+        AddrAbs = (ushort)((hi << 8) | lo);
+        AddrAbs += X;
+
+        return (byte)((AddrAbs & 0xFF00) != hi << 8 ? 1 : 0);
+    }
+
+    public byte Aby()
+    {
+        ushort lo = Read(Pc);
+        Pc++;
+        ushort hi = Read(Pc);
+        Pc++;
+
+        AddrAbs = (ushort)((hi << 8) | lo);
+        AddrAbs += Y;
+
+        return (byte)((AddrAbs & 0xFF00) != hi << 8 ? 1 : 0);
+    }
+
+    public byte Ind()
+    {
+        ushort ptrLo = Read(Pc);
+        Pc++;
+        ushort ptrHi = Read(Pc);
+        Pc++;
+
+        ushort ptr = (ushort)((ptrHi << 8) | ptrLo);
+        ushort ptrInc = (ushort)(ptr + 1);
+
+        if (ptrLo == 0x00FF) // page boundary bug behavior
+        {
+            AddrAbs = (ushort)((Read((ushort)(ptr & 0xFF00)) << 8) | Read(ptr));
+        }
+        else // normal behavior
+        {
+            AddrAbs = (ushort)(Read(ptrInc) << 8 | Read(ptr));
+        }
+
+        return 0;
+    }
+
+    public byte Izx()
+    {
+        ushort t = Read(Pc);
+        Pc++;
+
+        ushort lo = Read((ushort)((t + X) & 0x00FF));
+        ushort hi = Read((ushort)((t + X + 1) & 0x00FF));
+
+        AddrAbs = (ushort)((hi << 8) | lo);
+
+        return 0;
+    }
+
+    public byte Izy()
+    {
+        ushort t = Read(Pc);
+        Pc++;
+
+        ushort lo = Read((ushort)(t & 0x00FF));
+        ushort hi = Read((ushort)((t + 1) & 0x00FF));
+
+        AddrAbs = (ushort)(((hi << 8) | lo) + Y);
+
+        if ((AddrAbs & 0xFF00) != (hi << 8))
+            return 1;
+
+        return 0;
+    }
+
     // Opcodes
-    public byte Adc() { return 0; }
-    public byte And() { return 0; }
-    public byte Asl() { return 0; }
-    public byte Bcc() { return 0; }
-    public byte Bcs() { return 0; }
-    public byte Beq() { return 0; }
-    public byte Bit() { return 0; }
-    public byte Bmi() { return 0; }
-    public byte Bne() { return 0; }
-    public byte Bpl() { return 0; }
-    public byte Brk() { return 0; }
-    public byte Bvc() { return 0; }
-    public byte Bvs() { return 0; }
-    public byte Clc() { return 0; }
-    public byte Cld() { return 0; }
-    public byte Cli() { return 0; }
-    public byte Clv() { return 0; }
-    public byte Cmp() { return 0; }
-    public byte Cpx() { return 0; }
-    public byte Cpy() { return 0; }
-    public byte Dec() { return 0; }
-    public byte Dex() { return 0; }
-    public byte Dey() { return 0; }
-    public byte Eor() { return 0; }
-    public byte Inc() { return 0; }
-    public byte Inx() { return 0; }
-    public byte Iny() { return 0; }
-    public byte Jmp() { return 0; }
-    public byte Jsr() { return 0; }
-    public byte Lda() { return 0; }
-    public byte Ldx() { return 0; }
-    public byte Ldy() { return 0; }
-    public byte Lsr() { return 0; }
-    public byte Nop() { return 0; }
-    public byte Ora() { return 0; }
-    public byte Pha() { return 0; }
-    public byte Php() { return 0; }
-    public byte Pla() { return 0; }
-    public byte Plp() { return 0; }
-    public byte Rol() { return 0; }
-    public byte Ror() { return 0; }
-    public byte Rti() { return 0; }
-    public byte Rts() { return 0; }
-    public byte Sbc() { return 0; }
-    public byte Sec() { return 0; }
-    public byte Sed() { return 0; }
-    public byte Sei() { return 0; }
-    public byte Sta() { return 0; }
-    public byte Stx() { return 0; }
-    public byte Sty() { return 0; }
-    public byte Tax() { return 0; }
-    public byte Tay() { return 0; }
-    public byte Tsx() { return 0; }
-    public byte Txa() { return 0; }
-    public byte Txs() { return 0; }
-    public byte Tya() { return 0; }
-    public byte Xxx() { return 0; }
+    public byte Adc()
+    {
+        Fetch();
+        ushort temp = (ushort)(A + Fetched + GetFlag(Flags6502.C));
+        SetFlag(Flags6502.C, temp > 255);
+        SetFlag(Flags6502.Z, (temp & 0x00FF) == 0);
+        SetFlag(Flags6502.V, ((~((ushort)A ^ (ushort)Fetched) & ((ushort)A ^ (ushort)temp)) & 0x0080) != 0);
+        SetFlag(Flags6502.N, (temp & 0x80) != 0);
+
+        A = (byte)(temp & 0x00FF);
+
+        return 1;
+    }
+
+    public byte And()
+    {
+        Fetch();
+        A = (byte)(A & Fetched);
+
+        SetFlag(Flags6502.Z, A == 0x00);
+        SetFlag(Flags6502.N, (A & 0x80) != 0);
+
+        return 1;
+    }
+
+    public byte Asl()
+    {
+        return 0;
+    }
+
+    public byte Bcc()
+    {
+        if (GetFlag(Flags6502.C) == 0)
+        {
+            Cycles++;
+            AddrAbs = (ushort)(Pc + AddRel);
+
+            if ((AddrAbs & 0xFF00) != (Pc & 0xFF00))
+            {
+                Cycles++;
+            }
+
+            Pc = AddrAbs;
+        }
+
+        return 0;
+    }
+
+    public byte Bcs()
+    {
+        if (GetFlag(Flags6502.C) == 1)
+        {
+            Cycles++;
+            AddrAbs = (ushort)(Pc + AddRel);
+
+            if ((AddrAbs & 0xFF00) != (Pc & 0xFF00))
+            {
+                Cycles++;
+            }
+
+            Pc = AddrAbs;
+        }
+
+        return 0;
+    }
+
+    public byte Beq()
+    {
+        if (GetFlag(Flags6502.Z) == 1)
+        {
+            Cycles++;
+            AddrAbs = (ushort)(Pc + AddRel);
+
+            if ((AddrAbs & 0xFF00) != (Pc & 0xFF00))
+            {
+                Cycles++;
+            }
+
+            Pc = AddrAbs;
+        }
+
+        return 0;
+    }
+
+    public byte Bit()
+    {
+        return 0;
+    }
+
+    public byte Bmi()
+    {
+        if (GetFlag(Flags6502.N) == 1)
+        {
+            Cycles++;
+            AddrAbs = (ushort)(Pc + AddRel);
+
+            if ((AddrAbs & 0xFF00) != (Pc & 0xFF00))
+            {
+                Cycles++;
+            }
+
+            Pc = AddrAbs;
+        }
+
+        return 0;
+    }
+
+    public byte Bne()
+    {
+        if (GetFlag(Flags6502.Z) == 0)
+        {
+            Cycles++;
+            AddrAbs = (ushort)(Pc + AddRel);
+
+            if ((AddrAbs & 0xFF00) != (Pc & 0xFF00))
+            {
+                Cycles++;
+            }
+
+            Pc = AddrAbs;
+        }
+
+        return 0;
+    }
+
+    public byte Bpl()
+    {
+        if (GetFlag(Flags6502.N) == 0)
+        {
+            Cycles++;
+            AddrAbs = (ushort)(Pc + AddRel);
+
+            if ((AddrAbs & 0xFF00) != (Pc & 0xFF00))
+            {
+                Cycles++;
+            }
+
+            Pc = AddrAbs;
+        }
+
+        return 0;
+    }
+
+    public byte Brk()
+    {
+        return 0;
+    }
+
+    public byte Bvc()
+    {
+        if (GetFlag(Flags6502.V) == 0)
+        {
+            Cycles++;
+            AddrAbs = (ushort)(Pc + AddRel);
+
+            if ((AddrAbs & 0xFF00) != (Pc & 0xFF00))
+            {
+                Cycles++;
+            }
+
+            Pc = AddrAbs;
+        }
+
+        return 0;
+    }
+
+    public byte Bvs()
+    {
+        if (GetFlag(Flags6502.V) == 1)
+        {
+            Cycles++;
+            AddrAbs = (ushort)(Pc + AddRel);
+
+            if ((AddrAbs & 0xFF00) != (Pc & 0xFF00))
+            {
+                Cycles++;
+            }
+
+            Pc = AddrAbs;
+        }
+
+        return 0;
+    }
+
+    public byte Clc()
+    {
+        SetFlag(Flags6502.C, false);
+        return 0;
+    }
+
+    public byte Cld()
+    {
+        SetFlag(Flags6502.D, false);
+        return 0;
+    }
+
+    public byte Cli()
+    {
+        return 0;
+    }
+
+    public byte Clv()
+    {
+        return 0;
+    }
+
+    public byte Cmp()
+    {
+        return 0;
+    }
+
+    public byte Cpx()
+    {
+        return 0;
+    }
+
+    public byte Cpy()
+    {
+        return 0;
+    }
+
+    public byte Dec()
+    {
+        return 0;
+    }
+
+    public byte Dex()
+    {
+        return 0;
+    }
+
+    public byte Dey()
+    {
+        return 0;
+    }
+
+    public byte Eor()
+    {
+        return 0;
+    }
+
+    public byte Inc()
+    {
+        return 0;
+    }
+
+    public byte Inx()
+    {
+        return 0;
+    }
+
+    public byte Iny()
+    {
+        return 0;
+    }
+
+    public byte Jmp()
+    {
+        return 0;
+    }
+
+    public byte Jsr()
+    {
+        return 0;
+    }
+
+    public byte Lda()
+    {
+        return 0;
+    }
+
+    public byte Ldx()
+    {
+        return 0;
+    }
+
+    public byte Ldy()
+    {
+        return 0;
+    }
+
+    public byte Lsr()
+    {
+        return 0;
+    }
+
+    public byte Nop()
+    {
+        return 0;
+    }
+
+    public byte Ora()
+    {
+        return 0;
+    }
+
+    public byte Pha()
+    {
+        Write((ushort)(0x0100 + Stkp), A);
+        Stkp--;
+
+        return 0;
+    }
+
+    public byte Php()
+    {
+        return 0;
+    }
+
+    public byte Pla()
+    {
+        Stkp++;
+        A = Read((ushort)(0x0100 + Stkp));
+        SetFlag(Flags6502.Z, A == 0x00);
+        SetFlag(Flags6502.N, (A & 0x80) != 0);
+        return 0;
+    }
+
+    public byte Plp()
+    {
+        return 0;
+    }
+
+    public byte Rol()
+    {
+        return 0;
+    }
+
+    public byte Ror()
+    {
+        return 0;
+    }
+
+    public byte Rti()
+    {
+        Stkp++;
+        Status = Read((ushort)(0x0100 + Stkp));
+        Status &= (byte)~(Flags6502.B | Flags6502.U);
+
+        Stkp++;
+        Pc = (ushort)Read((ushort)(0x0100 + Stkp));
+        Stkp++;
+        Pc |= (ushort)(Read((ushort)(0x0100 + Stkp)) << 8);
+        return 0;
+    }
+
+    public byte Rts()
+    {
+        return 0;
+    }
+
+    public byte Sbc()
+    {
+        Fetch();
+
+        ushort value = (ushort)(Fetched ^ 0x00FF);
+
+        ushort temp = (ushort)(A + value + GetFlag(Flags6502.C));
+        SetFlag(Flags6502.C, (temp & 0xFF00) != 0);
+        SetFlag(Flags6502.Z, (temp & 0x00FF) == 0);
+        SetFlag(Flags6502.V, ((temp ^ A) & (temp ^ value) & 0x0080) != 0);
+        SetFlag(Flags6502.N, (temp & 0x0080) != 0);
+
+        A = (byte)(temp & 0x00FF);
+
+        return 1;
+    }
+
+    public byte Sec()
+    {
+        return 0;
+    }
+
+    public byte Sed()
+    {
+        return 0;
+    }
+
+    public byte Sei()
+    {
+        return 0;
+    }
+
+    public byte Sta()
+    {
+        return 0;
+    }
+
+    public byte Stx()
+    {
+        return 0;
+    }
+
+    public byte Sty()
+    {
+        return 0;
+    }
+
+    public byte Tax()
+    {
+        return 0;
+    }
+
+    public byte Tay()
+    {
+        return 0;
+    }
+
+    public byte Tsx()
+    {
+        return 0;
+    }
+
+    public byte Txa()
+    {
+        return 0;
+    }
+
+    public byte Txs()
+    {
+        return 0;
+    }
+
+    public byte Tya()
+    {
+        return 0;
+    }
+
+    public byte Xxx()
+    {
+        return 0;
+    }
 
     public void Clock()
     {
@@ -377,26 +858,101 @@ public class Olc6502
         {
             Opcode = Read(Pc);
             Pc++;
-            
+
             Cycles = _lookup[Opcode].Cycles;
 
             byte addCycle1 = _lookup[Opcode].AddrMode.Invoke();
             byte addCycle2 = _lookup[Opcode].Operate.Invoke();
-            
+
             Cycles = (byte)(Cycles + (addCycle1 & addCycle2));
         }
 
         Cycles--;
     }
-    
-    public void Reset() { }
-    public void Irq() { }
-    public void Nmi() { }
-    
-    public byte Fetch() {return 0x00; }
-    
-    private void Write(ushort addr, byte value) { _bus!.Write(addr, value); }
-    private byte Read(ushort addr) { return _bus!.Read(addr, false); }
+
+    public void Reset()
+    {
+        A = X = Y = 0;
+        Stkp = 0xFD;
+        Status = (byte)(0x00 | Flags6502.U);
+
+        AddrAbs = 0xFFFC;
+        ushort lo = Read((ushort)(AddrAbs + 0));
+        ushort hi = Read((ushort)(AddrAbs + 1));
+
+        Pc = (ushort)((hi << 8) | lo);
+        AddRel = AddrAbs = 0x0000;
+        Fetched = 0x00;
+
+        Cycles = 8;
+    }
+
+    public void Irq()
+    {
+        if (GetFlag(Flags6502.I) == 0)
+        {
+            Write((ushort)(0x0100 + Stkp), (byte)((Pc >> 8) & 0x00FF));
+            Stkp--;
+            Write((ushort)(0x0100 + Stkp), (byte)(Pc & 0x00FF));
+            Stkp--;
+
+            SetFlag(Flags6502.B, false);
+            SetFlag(Flags6502.U, true);
+            SetFlag(Flags6502.I, true);
+
+            Write((ushort)(0x0100 + Stkp), Status);
+            Stkp--;
+
+            AddrAbs = 0xFFFE;
+            ushort lo = Read((ushort)(AddrAbs + 0));
+            ushort hi = Read((ushort)(AddrAbs + 1));
+            Pc = (ushort)((hi << 8) | lo);
+
+            Cycles = 7;
+        }
+    }
+
+    public void Nmi()
+    {
+        Write((ushort)(0x0100 + Stkp), (byte)((Pc >> 8) & 0x00FF));
+        Stkp--;
+        Write((ushort)(0x0100 + Stkp), (byte)(Pc & 0x00FF));
+        Stkp--;
+
+        SetFlag(Flags6502.B, false);
+        SetFlag(Flags6502.U, true);
+        SetFlag(Flags6502.I, true);
+
+        Write((ushort)(0x0100 + Stkp), Status);
+        Stkp--;
+
+        AddrAbs = 0xFFFA;
+        ushort lo = Read((ushort)(AddrAbs + 0));
+        ushort hi = Read((ushort)(AddrAbs + 1));
+        Pc = (ushort)((hi << 8) | lo);
+
+        Cycles = 8;
+    }
+
+    public byte Fetch()
+    {
+        if (_lookup[Opcode].AddrMode != Imp)
+        {
+            Fetched = Read(AddrAbs);
+        }
+
+        return Fetched;
+    }
+
+    private void Write(ushort addr, byte value)
+    {
+        _bus!.Write(addr, value);
+    }
+
+    private byte Read(ushort addr)
+    {
+        return _bus!.Read(addr, false);
+    }
 
     private byte GetFlag(Flags6502 f)
     {
@@ -414,7 +970,7 @@ public class Olc6502
             Status = (byte)(Status & ~(byte)f);
         }
     }
-    
+
     [Flags]
     private enum Flags6502 : byte
     {
@@ -425,7 +981,7 @@ public class Olc6502
         B = (1 << 4), // Break
         U = (1 << 5), // Unused
         V = (1 << 6), // Overflow
-        N = (1 << 7)  // Negative
+        N = (1 << 7) // Negative
     }
 
     protected class Instruction(string name, Func<byte> operate, Func<byte> addrMode, byte cycles)
