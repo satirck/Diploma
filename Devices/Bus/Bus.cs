@@ -1,44 +1,69 @@
 namespace Devices.Bus;
 
 using CPU;
+using PPU;
+using Cartridge;
 
 public class Bus: IBus
 {
-    private const int RamSize = 1024 * 64;
-    
-    private byte[] _ram = new byte[RamSize];
+    private byte[] _cpuRam = new byte[2048];
+    private uint _nSystemClockCounter;
 
-    public Cpu6502 Cpu;
+    private Cpu6502 _cpu;
+    private Ppu2C02 _ppu;
+    private Cartridge _cart;
     
     public Bus()
     {
-        Array.Fill(_ram, (byte)0x00);
+        Array.Fill(_cpuRam, (byte)0x00);
         
         // Connecting the bus, later maybe change it
-        Cpu = new ();
-        Cpu.ConnectBus(this);
+        _cpu = new ();
+        _cpu.ConnectBus(this);
     }
 
-    public void Dispose()
+    public void InsertCartridge(Cartridge cartridge)
     {
-        //TODO: Later
+        _cart = cartridge;
+        _ppu.ConnectCart(cartridge);
+    }
+
+    public void Reset()
+    {
+        _cpu.Reset();
+        _nSystemClockCounter = 0;
+    }
+
+    public void Clock()
+    {
+        
     }
     
-    public void Write(ushort addr, byte value)
+    public void CpuWrite(ushort addr, byte data)
     {
-        if (addr >= 0x0000 && addr <= 0xFFFF)
+        if (addr is >= 0x0000 and <= 0x1FFF)
         {
-            _ram[addr] = value;       
+            _cpuRam[addr & 0x07FF] = data;       
+        } 
+        else if (addr is >= 0x2000 and <= 0x3FFF)
+        {
+            _ppu.CpuWrite((ushort)(addr & 0x0007), data);
         }
     }
 
-    public byte Read(ushort addr, bool bReadOnly = false)
+    public byte CpuRead(ushort addr, bool bReadOnly = false)
     {
-        if (addr >= 0x0000 && addr <= 0xFFFF)
+        byte data = 0x00;
+        
+        if (addr is >= 0x0000 and <= 0x1FFF)
         {
-            return _ram[addr];
+            data = _cpuRam[addr & 0x07FF];
+        }
+        else if (addr is >= 0x2000 and <= 0x3FFF)
+        {
+            data = _ppu.CpuRead((ushort)(addr & 0x0007), bReadOnly);
         }
         
-        return 0x00;
+        return data;
     }
 }
