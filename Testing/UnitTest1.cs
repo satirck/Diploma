@@ -1,5 +1,7 @@
 ﻿namespace Testing;
 
+using Devices;
+
 public class Tests
 {
     [SetUp]
@@ -10,6 +12,6 @@ public class Tests
     [Test]
     public void Test1()
     {
-        Assert.Pass();
+        
     }
 }

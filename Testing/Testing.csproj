@@ -20,4 +20,12 @@
         <Using Include="NUnit.Framework"/>
     </ItemGroup>
 
+    <ItemGroup>
+      <ProjectReference Include="..\Devices\Devices.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Folder Include="CPU\" />
+    </ItemGroup>
+
 </Project>

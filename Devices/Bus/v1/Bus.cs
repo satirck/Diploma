@@ -1,28 +1,21 @@
-namespace Devices.Bus;
+using Devices.PPU;
 
-using CPU;
-using PPU;
-using Cartridge;
+namespace Devices.Bus.v1;
 
-public class Bus: IBus
+public class Bus: AbstractBus, IBus
 {
     private byte[] _cpuRam = new byte[2048];
     private uint _nSystemClockCounter;
 
-    private Cpu6502 _cpu;
     private Ppu2C02 _ppu;
-    private Cartridge _cart;
+    private Cartridge.Cartridge _cart;
     
     public Bus()
     {
         Array.Fill(_cpuRam, (byte)0x00);
-        
-        // Connecting the bus, later maybe change it
-        _cpu = new ();
-        _cpu.ConnectBus(this);
     }
 
-    public void InsertCartridge(Cartridge cartridge)
+    public void InsertCartridge(Cartridge.Cartridge cartridge)
     {
         _cart = cartridge;
         _ppu.ConnectCart(cartridge);
@@ -30,18 +23,28 @@ public class Bus: IBus
 
     public void Reset()
     {
-        _cpu.Reset();
+        Cpu.Reset();
         _nSystemClockCounter = 0;
     }
 
-    public void Clock()
+    public override void Clock()
     {
-        
+        _ppu.Clock();
+        if (_nSystemClockCounter % 3 == 0)
+        {
+            Cpu.Clock();
+        }
+
+        _nSystemClockCounter++;
     }
     
-    public void CpuWrite(ushort addr, byte data)
+    public override void CpuWrite(ushort addr, byte data)
     {
-        if (addr is >= 0x0000 and <= 0x1FFF)
+        if (_cart.CpuWrite(addr, data))
+        {
+            
+        }
+        else if (addr is >= 0x0000 and <= 0x1FFF)
         {
             _cpuRam[addr & 0x07FF] = data;       
         } 
@@ -51,11 +54,15 @@ public class Bus: IBus
         }
     }
 
-    public byte CpuRead(ushort addr, bool bReadOnly = false)
+    public override byte CpuRead(ushort addr, bool bReadOnly = false)
     {
         byte data = 0x00;
         
-        if (addr is >= 0x0000 and <= 0x1FFF)
+        if (_cart.CpuRead(addr, ref data))
+        {
+            
+        }
+        else if (addr is >= 0x0000 and <= 0x1FFF)
         {
             data = _cpuRam[addr & 0x07FF];
         }
