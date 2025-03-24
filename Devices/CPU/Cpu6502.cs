@@ -6,7 +6,7 @@ public partial class Cpu6502
 {
     private IBus? _bus;
 
-    private List<Instruction> _lookup = null!;
+    public readonly List<Instruction> Lookup = null!;
 
     public byte A { get; private set; } = 0x00;
     public byte X { get; private set; } = 0x00;
@@ -33,7 +33,7 @@ public partial class Cpu6502
 
     public byte Fetch()
     {
-        if (_lookup[Opcode].AddrMode != Imp)
+        if (Lookup[Opcode].AddrMode != Imp)
         {
             Fetched = Read(AddrAbs);
         }

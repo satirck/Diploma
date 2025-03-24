@@ -4,7 +4,7 @@ public partial class Cpu6502
 {
     public Cpu6502()
     {
-        _lookup =
+        Lookup =
         [
             new Instruction("BRK", Brk, Imm, 7),
             new Instruction("ORA", Ora, Izx, 6),
@@ -263,7 +263,7 @@ public partial class Cpu6502
             new Instruction("INC", Inc, Abx, 7),
             new Instruction("???", Xxx, Imp, 7)
         ];
-        _lookup =
+        Lookup =
         [
             new Instruction("BRK", Brk, Imm, 7),
             new Instruction("ORA", Ora, Izx, 6),
@@ -695,7 +695,7 @@ public partial class Cpu6502
         SetFlag(Flags6502.Z, (temp & 0x00FF) == 0);
         SetFlag(Flags6502.N, (temp & 0x80) != 0);
 
-        if (_lookup[Opcode].AddrMode == Imp)
+        if (Lookup[Opcode].AddrMode == Imp)
             A = (byte)(temp & 0x00FF);
         else
             Write(AddrAbs, (byte)(temp & 0x00FF));
@@ -1061,7 +1061,7 @@ public partial class Cpu6502
         SetFlag(Flags6502.Z, (temp & 0x00FF) == 0x0000);
         SetFlag(Flags6502.N, (temp & 0x0080) != 0);
 
-        if (_lookup[Opcode].AddrMode == Imp)
+        if (Lookup[Opcode].AddrMode == Imp)
             A = (byte)(temp & 0x00FF);
         else
             Write(AddrAbs, (byte)(temp & 0x00FF));
@@ -1139,7 +1139,7 @@ public partial class Cpu6502
         SetFlag(Flags6502.Z, (Temp & 0x00FF) == 0x00);
         SetFlag(Flags6502.N, (Temp & 0x0080) != 0);
 
-        if (_lookup[Opcode].AddrMode == Imp)
+        if (Lookup[Opcode].AddrMode == Imp)
             A = (byte)(Temp & 0x00FF);
         else
             Write(AddrAbs, (byte)(Temp & 0x00FF));
@@ -1155,7 +1155,7 @@ public partial class Cpu6502
         SetFlag(Flags6502.Z, (Temp & 0x00FF) == 0x00);
         SetFlag(Flags6502.N, (Temp & 0x0080) != 0);
 
-        if (_lookup[Opcode].AddrMode == Imp)
+        if (Lookup[Opcode].AddrMode == Imp)
             A = (byte)(Temp & 0x00FF);
         else
             Write(AddrAbs, (byte)(Temp & 0x00FF));
@@ -1300,11 +1300,11 @@ public partial class Cpu6502
             Opcode = Read(Pc);
             Pc++;
 
-            Cycles = _lookup[Opcode].Cycles;
+            Cycles = Lookup[Opcode].Cycles;
 
-            Console.WriteLine($"Executing [{_lookup[Opcode].Name}]");
-            byte addCycle1 = _lookup[Opcode].AddrMode.Invoke();
-            byte addCycle2 = _lookup[Opcode].Operate.Invoke();
+            // Console.WriteLine($"Executing [{Lookup[Opcode].Name}]");
+            byte addCycle1 = Lookup[Opcode].AddrMode.Invoke();
+            byte addCycle2 = Lookup[Opcode].Operate.Invoke();
 
             Cycles = (byte)(Cycles + (addCycle1 & addCycle2));
         }
