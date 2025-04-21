@@ -45,7 +45,7 @@ public class Cartridge
             {}
             else if (nFileType == 1)
             {
-                _nPrgBanks = header.PrgRamSize;
+                _nPrgBanks = header.PrgRomChunks;
                 _vPrgMemory = new List<byte>(_nPrgBanks * 16384);
                 _vPrgMemory.AddRange(reader.ReadBytes(_vPrgMemory.Capacity));
 

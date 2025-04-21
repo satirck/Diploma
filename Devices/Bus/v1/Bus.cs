@@ -7,7 +7,7 @@ public class Bus: AbstractBus, IBus
     private byte[] _cpuRam = new byte[2048];
     private uint _nSystemClockCounter;
 
-    private Ppu2C02 _ppu;
+    public Ppu2C02 Ppu;
     private Cartridge.Cartridge _cart;
     
     public Bus()
@@ -18,7 +18,7 @@ public class Bus: AbstractBus, IBus
     public void InsertCartridge(Cartridge.Cartridge cartridge)
     {
         _cart = cartridge;
-        _ppu.ConnectCart(cartridge);
+        Ppu.ConnectCart(cartridge);
     }
 
     public void Reset()
@@ -29,10 +29,16 @@ public class Bus: AbstractBus, IBus
 
     public override void Clock()
     {
-        _ppu.Clock();
+        Ppu.Clock();
         if (_nSystemClockCounter % 3 == 0)
         {
             Cpu.Clock();
+        }
+
+        if (Ppu.Nmi)
+        {
+            Ppu.Nmi = false;
+            Cpu.Nmi();
         }
 
         _nSystemClockCounter++;
@@ -50,7 +56,7 @@ public class Bus: AbstractBus, IBus
         } 
         else if (addr is >= 0x2000 and <= 0x3FFF)
         {
-            _ppu.CpuWrite((ushort)(addr & 0x0007), data);
+            Ppu.CpuWrite((ushort)(addr & 0x0007), data);
         }
     }
 
@@ -68,7 +74,7 @@ public class Bus: AbstractBus, IBus
         }
         else if (addr is >= 0x2000 and <= 0x3FFF)
         {
-            data = _ppu.CpuRead((ushort)(addr & 0x0007), bReadOnly);
+            data = Ppu.CpuRead((ushort)(addr & 0x0007), bReadOnly);
         }
         
         return data;

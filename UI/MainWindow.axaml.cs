@@ -1,15 +1,18 @@
 using System;
-using System.IO;
 using System.Text;
 using System.Timers;
+using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Media;
+using Avalonia.Media.Imaging;
 using Avalonia.Threading;
-using Devices.Bus;
 using Devices.Bus.v1;
+using Devices.Cartridge;
 using Devices.CPU;
+using Devices.PPU;
 
 namespace UI;
 
@@ -19,10 +22,21 @@ public partial class MainWindow : Window
     private Grid _mainGrid;
     private StackPanel _flagsPanel;
 
+    private Image _screenImage;
+    private WriteableBitmap _bitmap;
+
+    private Image _patternTable0Image;
+    private Image _patternTable1Image;
+
     private Timer _updateTimer;
-    private bool _isPaused = true;
-    private IBus _nes;
-    
+    private Bus _nes;
+    private Cartridge _cart;
+
+    private string _path = "/home/miki/Downloads/nestest.nes";
+    private bool _isEmuRunning = false;
+
+    private byte _selectedPallet = 0;
+
     public MainWindow()
     {
         InitializeComponent();
@@ -31,77 +45,127 @@ public partial class MainWindow : Window
         MinWidth = 600;
         MinHeight = 600;
 
-        _nes = new SimpleBus();
-        LoadTestProgram();
+        _nes = new Bus();
+        _nes.Ppu = new Ppu2C02();
+
+        _cart = new Cartridge(_path);
+        _nes.InsertCartridge(_cart);
+
         _nes.Cpu.Reset();
-        _nes.Cpu.Pc = 0xC000;
-        
+
         _mainGrid = this.FindControl<Grid>("MainGrid") ?? throw new Exception("Main grid cannot be created");
         SetupUi();
 
-        _updateTimer = new Timer(10);
+        _updateTimer = new Timer(16);
         _updateTimer.Elapsed += (_, _) => Dispatcher.UIThread.Post(UpdateCpuInfo);
         _updateTimer.Start();
     }
 
     private void OnKeyDown(object? sender, KeyEventArgs e)
     {
-        if (e.Key == Key.Space && _isPaused)
+        if (e.Key == Key.R)
         {
-            _nes.Clock();
+            _nes.Cpu.Reset();
+            _isEmuRunning = false;
         }
 
         if (e.Key == Key.P)
         {
-            _isPaused = !_isPaused;
-        }
-        
-        if (e.Key == Key.R)
-        {
-            _nes.Cpu.Reset();
-            _nes.Cpu.Pc = 0xC000;
-        }
-    }
-
-    private void LoadTestProgram()
-    {
-        string path = "/home/miki/Downloads/nestest.nes";
-        byte[] romBytes = File.ReadAllBytes(path);
-        int prgRomStart = 0x0010;
-        int prgRomSize = 0x4000;
-
-        byte[] prgRom = new byte[prgRomSize];
-        Array.Copy(romBytes, prgRomStart, prgRom, 0, prgRomSize);
-
-        for (int i = 0; i < prgRomSize; i++)
-        {
-            _nes.CpuWrite((ushort)(0x8000 + i), prgRom[i]);
+            _isEmuRunning = !_isEmuRunning;
         }
 
-        for (int i = 0; i < prgRomSize; i++)
+        if (e.Key == Key.N)
         {
-            _nes.CpuWrite((ushort)(0xC000 + i), prgRom[i]);
+            ++_selectedPallet;
+            _selectedPallet &= 0x07;
+        }
+
+        if (_isEmuRunning)
+        {
+            return;
+        }
+
+        if (e.Key == Key.C)
+        {
+            do
+            {
+                _nes.Clock();
+            } while (!_nes.Cpu.Complete());
+
+            do
+            {
+                _nes.Clock();
+            } while (_nes.Cpu.Complete());
+        }
+
+        if (e.Key == Key.F)
+        {
+            do
+            {
+                _nes.Clock();
+            } while (!_nes.Ppu.FrameComplete);
+
+            do
+            {
+                _nes.Clock();
+            } while (!_nes.Cpu.Complete());
+
+            _nes.Ppu.FrameComplete = false;
         }
     }
 
     private void SetupUi()
     {
-        _cpuInfoTextBlock = new TextBlock
+        _mainGrid.RowDefinitions.Add(new RowDefinition(GridLength.Star));
+        _mainGrid.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Star));
+        _mainGrid.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(2)));
+        _mainGrid.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(200)));
+
+        // === ЭКРАН NES ===
+        _screenImage = new Image
         {
-            Text = "CPU Info",
-            FontSize = 14,
-            HorizontalAlignment = HorizontalAlignment.Left,
-            VerticalAlignment = VerticalAlignment.Top,
-            TextWrapping = TextWrapping.Wrap,
-            Margin = new Avalonia.Thickness(10)
+            Width = 256,
+            Height = 240,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center,
+            Stretch = Stretch.None,
         };
 
-        _flagsPanel = new StackPanel
-        {
-            Orientation = Orientation.Vertical,
-            Margin = new Avalonia.Thickness(10)
-        };
+        int width = 256;
+        int height = 240;
 
+        _bitmap = new WriteableBitmap(
+            new PixelSize(width, height),
+            new Vector(96, 96),
+            Avalonia.Platform.PixelFormat.Bgra8888,
+            Avalonia.Platform.AlphaFormat.Unpremul);
+
+        using (var fb = _bitmap.Lock())
+        {
+            unsafe
+            {
+                uint* buffer = (uint*)fb.Address;
+                uint red = 0xFFFF0000;
+
+                for (int i = 0; i < width * height; i++)
+                    buffer[i] = red;
+            }
+        }
+
+        _screenImage.Source = _bitmap;
+
+        var imageContainer = new Grid
+        {
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        imageContainer.Children.Add(_screenImage);
+
+        _mainGrid.Children.Add(imageContainer);
+        Grid.SetColumn(imageContainer, 0);
+        Grid.SetRow(imageContainer, 0);
+
+        // === СЕПАРАТОР ===
         var separator = new Border
         {
             Background = Brushes.Gray,
@@ -109,33 +173,161 @@ public partial class MainWindow : Window
             VerticalAlignment = VerticalAlignment.Stretch
         };
 
-        var cpuInfoPanel = new StackPanel
+        _mainGrid.Children.Add(separator);
+        Grid.SetColumn(separator, 1);
+        Grid.SetRow(separator, 0);
+
+        // === CPU INFO + Pattern Tables ===
+
+        _cpuInfoTextBlock = new TextBlock
         {
-            Children = { _cpuInfoTextBlock, _flagsPanel }, // Добавляем _flagsPanel
-            Margin = new Avalonia.Thickness(10)
+            Text = "CPU Info",
+            FontSize = 14,
+            HorizontalAlignment = HorizontalAlignment.Left,
+            VerticalAlignment = VerticalAlignment.Top,
+            TextWrapping = TextWrapping.Wrap,
+            Margin = new Thickness(10)
         };
 
-        _mainGrid.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Star));
-        _mainGrid.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(2))); // Полоса-разделитель
-        _mainGrid.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(200))); // Колонка CPU Info
+        _flagsPanel = new StackPanel
+        {
+            Orientation = Orientation.Vertical,
+            Margin = new Thickness(10)
+        };
 
-        _mainGrid.Children.Add(separator);
-        _mainGrid.Children.Add(cpuInfoPanel);
+        _patternTable0Image = new Image
+        {
+            Width = 128,
+            Height = 128,
+            Margin = new Thickness(5)
+        };
 
-        Grid.SetColumn(separator, 1);
-        Grid.SetColumn(cpuInfoPanel, 2);
+        _patternTable1Image = new Image
+        {
+            Width = 128,
+            Height = 128,
+            Margin = new Thickness(5)
+        };
+
+        var patternTablePanel = new StackPanel
+        {
+            Orientation = Orientation.Vertical,
+            Children = { _patternTable0Image, _patternTable1Image },
+            Margin = new Thickness(10)
+        };
+
+        var cpuInfoPanel = new StackPanel
+        {
+            Children = { _cpuInfoTextBlock, _flagsPanel, patternTablePanel },
+            Margin = new Thickness(10)
+        };
+
+        // Обернём всё в ScrollViewer, чтобы содержимое не обрезалось
+        var scrollViewer = new ScrollViewer
+        {
+            Content = cpuInfoPanel,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto
+        };
+
+        _mainGrid.Children.Add(scrollViewer);
+        Grid.SetColumn(scrollViewer, 2);
+        Grid.SetRow(scrollViewer, 0);
+    }
+
+
+    private void RenderSpriteToImage(Sprite sprite)
+    {
+        var width = 256;
+        var height = 240;
+
+        if (sprite.PColData.Count != width * height)
+        {
+            Console.WriteLine($"[ERROR] PColData has unexpected size: {sprite.PColData.Count}");
+            return;
+        }
+
+        _bitmap = new WriteableBitmap(
+            new PixelSize(width, height),
+            new Vector(96, 96),
+            Avalonia.Platform.PixelFormat.Bgra8888,
+            Avalonia.Platform.AlphaFormat.Unpremul);
+
+        using (var fb = _bitmap.Lock())
+        {
+            unsafe
+            {
+                uint* buffer = (uint*)fb.Address;
+
+                for (int y = 0; y < height; y++)
+                {
+                    for (int x = 0; x < width; x++)
+                    {
+                        var color = sprite.PColData[y * width + x];
+                        byte r = (byte)color.X;
+                        byte g = (byte)color.Y;
+                        byte b = (byte)color.Z;
+                        byte a = (byte)color.W;
+
+                        buffer[y * width + x] = (uint)((a << 24) | (b << 16) | (g << 8) | r);
+                    }
+                }
+            }
+        }
+
+        Dispatcher.UIThread.Post(() => { _screenImage.Source = _bitmap; });
+    }
+
+    private void RenderPatternTable(Sprite sprite, Image imageControl)
+    {
+        int width = 128;
+        int height = 128;
+
+        var bitmap = new WriteableBitmap(
+            new PixelSize(width, height),
+            new Vector(96, 96),
+            Avalonia.Platform.PixelFormat.Bgra8888,
+            Avalonia.Platform.AlphaFormat.Unpremul);
+
+        using (var fb = bitmap.Lock())
+        {
+            unsafe
+            {
+                uint* buffer = (uint*)fb.Address;
+
+                for (int y = 0; y < height; y++)
+                {
+                    for (int x = 0; x < width; x++)
+                    {
+                        var color = sprite.PColData[y * width + x];
+                        byte r = (byte)color.X;
+                        byte g = (byte)color.Y;
+                        byte b = (byte)color.Z;
+                        byte a = (byte)color.W;
+
+                        buffer[y * width + x] = (uint)((a << 24) | (b << 16) | (g << 8) | r);
+                    }
+                }
+            }
+        }
+
+        Dispatcher.UIThread.Post(() => { imageControl.Source = bitmap; });
     }
 
     private void UpdateCpuInfo()
     {
-        if (!_isPaused)
+        if (_isEmuRunning)
         {
-            _nes.Clock();
+            do
+            {
+                _nes.Clock();
+            } while (!_nes.Ppu.FrameComplete);
+
+            _nes.Ppu.FrameComplete = false;
         }
 
         var cpu = _nes.Cpu;
         var status = cpu.Status;
-        
+
         byte testResultLow = _nes.CpuRead(0x0002);
         byte testResultHigh = _nes.CpuRead(0x0003);
         ushort testResult = (ushort)(testResultLow | (testResultHigh << 8));
@@ -150,19 +342,13 @@ public partial class MainWindow : Window
         sb.AppendLine($"Opcode = {cpu.Lookup[cpu.Opcode].Name}");
         sb.AppendLine($"Test Result: 0x{testResult:X4}");
 
-        if (cpu.Lookup[cpu.Opcode].Name == "BRL")
-        {
-            _isPaused = true;
-            Title = "Tests are done";
-        }
-
         var flagNames = new[] { "N", "V", "U", "B", "D", "I", "Z", "C" };
         var flagValues = new[]
         {
             Flags6502.N, Flags6502.V, Flags6502.U, Flags6502.B,
             Flags6502.D, Flags6502.I, Flags6502.Z, Flags6502.C
         };
-        
+
         _cpuInfoTextBlock.Text = sb.ToString();
 
         // Обновляем панель флагов с цветным отображением
@@ -181,7 +367,7 @@ public partial class MainWindow : Window
                 Text = flagNames[i],
                 Foreground = color,
                 FontWeight = FontWeight.Bold,
-                Margin = new Avalonia.Thickness(4, 0)
+                Margin = new Thickness(4, 0)
             };
 
             var valueText = new TextBlock
@@ -189,7 +375,7 @@ public partial class MainWindow : Window
                 Text = isSet ? "1" : "0",
                 Foreground = color,
                 FontWeight = FontWeight.Bold,
-                Margin = new Avalonia.Thickness(4, 0)
+                Margin = new Thickness(4, 0)
             };
 
             flagsRow.Children.Add(flagText);
@@ -198,5 +384,11 @@ public partial class MainWindow : Window
 
         _flagsPanel.Children.Add(flagsRow);
         _flagsPanel.Children.Add(valuesRow);
+
+        var screen = _nes.Ppu.GetScreen();
+        RenderSpriteToImage(screen);
+
+        RenderPatternTable(_nes.Ppu.GetPatternTable(0, _selectedPallet), _patternTable0Image);
+        RenderPatternTable(_nes.Ppu.GetPatternTable(1, _selectedPallet), _patternTable1Image);
     }
 }

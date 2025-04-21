@@ -5,9 +5,7 @@
         x:Class="UI.MainWindow">
 
     <Grid Name="MainGrid">
-        <TextBlock Text="Главное окно"
-                   HorizontalAlignment="Center"
-                   VerticalAlignment="Center"/>
+        
     </Grid>
 
 </Window>

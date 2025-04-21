@@ -43,6 +43,7 @@ public partial class Ppu2C02
     private Random _random = new Random();
     
     public bool FrameComplete = false;
+    public bool Nmi = false;
         
     public void ConnectCart(Cartridge cartridge)
     {
@@ -51,6 +52,17 @@ public partial class Ppu2C02
 
     public void Clock()
     {
+        if (_scanline == -1 && _cycle == -1)
+        {
+            _status.VerticalBlank = false;
+        }
+        
+        if (_scanline == 241 && _cycle == 1)
+        {
+            _status.VerticalBlank = true;
+            if (_control.enableNmi) { Nmi = true; }
+        }
+        
         _sprScreen.SetPixel(_cycle - 1, _scanline, _palScreen[_random.Next() % 2 == 0 ? 0x3F : 0x30]);
         
         _cycle++;
@@ -124,7 +136,6 @@ public partial class Ppu2C02
             case PpuAddrStates.Mask:
                 break;
             case PpuAddrStates.Status:
-                _status.VerticalBlank = true;
                 data = (byte)((_status.reg & 0xE0) | (_ppuDataBuffer & 0x1F));
                 _status.VerticalBlank = false;
                 _addrLatch = 0;
@@ -170,7 +181,7 @@ public partial class Ppu2C02
             case PpuAddrStates.PpuAddress:
                 if (_addrLatch == 0)
                 {
-                    _ppuAddr = (ushort)((_ppuAddr & 0xFF00) | (data << 8));
+                    _ppuAddr = (ushort)((_ppuAddr & 0x00FF) | (data << 8));
                     _addrLatch = 1;
                 }
                 else
