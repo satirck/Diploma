@@ -1,11 +1,25 @@
+using Devices.PPU.PpuRegisters;
+
 namespace Devices.PPU;
 
 public partial class Ppu2C02
 {
     private Cartridge.Cartridge _cart;
+    
     private short _scanline;
     private short _cycle;
 
+    private Status _status;
+    private Mask _mask;
+    private Control _control;
+    private LoopyRegister _vramAddr;
+    private LoopyRegister _tramAddr;
+
+    private byte _fineX = 0x00;
+    private byte _addressLatch = 0x00;
+    private byte _ppuDataBuffer = 0x00;
+    private ushort _ppuAddr = 0x0000;
+    
     private byte[][] _tblName = new byte[2][]
     {
         new byte[1024],

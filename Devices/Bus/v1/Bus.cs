@@ -40,11 +40,11 @@ public class Bus: AbstractBus, IBus
             Cpu.Clock();
         }
 
-        if (Ppu.Nmi)
-        {
-            Ppu.Nmi = false;
-            Cpu.Nmi();
-        }
+        // if (Ppu.Nmi)
+        // {
+        //     Ppu.Nmi = false;
+        //     Cpu.Nmi();
+        // }
 
         _nSystemClockCounter++;
     }

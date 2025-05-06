@@ -10,10 +10,6 @@ public partial class Ppu2C02
     //Utils
     private readonly Random _random = new Random();
 
-    //Modules of Nes
-
-    //Variables
-
     public void Clock()
     {
         // Fake some noise for now
@@ -92,6 +88,10 @@ public partial class Ppu2C02
             case 0x0001: // Mask
                 break;
             case 0x0002: // Status
+                _status.VerticalBlank = true;
+                data = (byte)((_status.Reg & 0xE0) | (_ppuDataBuffer & 0x1F));
+                _status.VerticalBlank = false;
+                _addressLatch = 0;
                 break;
             case 0x0003: // OAM Address
                 break;
@@ -102,6 +102,11 @@ public partial class Ppu2C02
             case 0x0006: // PPU Address
                 break;
             case 0x0007: // PPU Data
+                data = _ppuDataBuffer;
+                _ppuDataBuffer = PpuRead(_ppuAddr);
+
+                if (_ppuAddr > 0x3F00) data = _ppuDataBuffer;
+                _ppuAddr++;
                 break;
         }
 
@@ -113,8 +118,10 @@ public partial class Ppu2C02
         switch (addr)
         {
             case 0x0000: // Control
+                _control.reg = data;
                 break;
             case 0x0001: // Mask
+                _mask.Reg = data;
                 break;
             case 0x0002: // Status
                 break;
@@ -125,8 +132,20 @@ public partial class Ppu2C02
             case 0x0005: // Scroll
                 break;
             case 0x0006: // PPU Address
+                if (_addressLatch == 0)
+                {
+                    _ppuAddr = (ushort)((_ppuAddr & 0x00FF) | (data << 8));
+                    _addressLatch = 1;
+                }
+                else
+                {
+                    _ppuAddr = (ushort)((_ppuAddr & 0xFF00) | data);
+                    _addressLatch = 0;
+                }
                 break;
             case 0x0007: // PPU Data
+                PpuWrite(_ppuAddr, data);
+                _ppuAddr++;
                 break;
         }
     }
