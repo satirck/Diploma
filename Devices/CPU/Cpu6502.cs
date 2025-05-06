@@ -4,7 +4,7 @@ using Bus;
 
 public partial class Cpu6502
 {
-    private IBus? _bus;
+    private IBus _bus;
 
     public readonly List<Instruction> Lookup = null!;
 

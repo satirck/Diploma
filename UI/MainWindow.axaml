@@ -3,7 +3,6 @@
         Title="MainWindow"
         MinWidth="600" MinHeight="600"
         x:Class="UI.MainWindow">
-
     <Grid Name="MainGrid">
         
     </Grid>

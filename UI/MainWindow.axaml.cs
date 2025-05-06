@@ -124,15 +124,15 @@ public partial class MainWindow : Window
         // === ЭКРАН NES ===
         _screenImage = new Image
         {
-            Width = 256,
-            Height = 240,
-            HorizontalAlignment = HorizontalAlignment.Center,
-            VerticalAlignment = VerticalAlignment.Center,
+            Width = 512, 
+            Height = 480,
+            HorizontalAlignment = HorizontalAlignment.Left,
+            VerticalAlignment = VerticalAlignment.Top,
             Stretch = Stretch.None,
         };
-
-        int width = 256;
-        int height = 240;
+        
+        int width = 512; // Ширина экрана 2x
+        int height = 480; 
 
         _bitmap = new WriteableBitmap(
             new PixelSize(width, height),
@@ -156,9 +156,10 @@ public partial class MainWindow : Window
 
         var imageContainer = new Grid
         {
-            HorizontalAlignment = HorizontalAlignment.Center,
-            VerticalAlignment = VerticalAlignment.Center
+            HorizontalAlignment = HorizontalAlignment.Left,
+            VerticalAlignment = VerticalAlignment.Top,
         };
+
         imageContainer.Children.Add(_screenImage);
 
         _mainGrid.Children.Add(imageContainer);
@@ -263,12 +264,8 @@ public partial class MainWindow : Window
                     for (int x = 0; x < width; x++)
                     {
                         var color = sprite.PColData[y * width + x];
-                        byte r = (byte)color.X;
-                        byte g = (byte)color.Y;
-                        byte b = (byte)color.Z;
-                        byte a = (byte)color.W;
 
-                        buffer[y * width + x] = (uint)((a << 24) | (b << 16) | (g << 8) | r);
+                        buffer[y * width + x] = color.ToUInt32();
                     }
                 }
             }
@@ -299,12 +296,8 @@ public partial class MainWindow : Window
                     for (int x = 0; x < width; x++)
                     {
                         var color = sprite.PColData[y * width + x];
-                        byte r = (byte)color.X;
-                        byte g = (byte)color.Y;
-                        byte b = (byte)color.Z;
-                        byte a = (byte)color.W;
 
-                        buffer[y * width + x] = (uint)((a << 24) | (b << 16) | (g << 8) | r);
+                        buffer[y * width + x] = color.ToUInt32();
                     }
                 }
             }
@@ -388,7 +381,7 @@ public partial class MainWindow : Window
         var screen = _nes.Ppu.GetScreen();
         RenderSpriteToImage(screen);
 
-        RenderPatternTable(_nes.Ppu.GetPatternTable(0, _selectedPallet), _patternTable0Image);
-        RenderPatternTable(_nes.Ppu.GetPatternTable(1, _selectedPallet), _patternTable1Image);
+        // RenderPatternTable(_nes.Ppu.GetPatternTable(0, _selectedPallet), _patternTable0Image);
+        // RenderPatternTable(_nes.Ppu.GetPatternTable(1, _selectedPallet), _patternTable1Image);
     }
 }
