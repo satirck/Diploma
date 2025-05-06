@@ -4,6 +4,55 @@ namespace Devices.PPU;
 
 public partial class Ppu2C02
 {
+    private ushort _bgShifterPatternLo = 0x0000;
+    private ushort _bgShifterPatternHi = 0x0000;
+    private ushort _bgShifterAttribLo  = 0x0000;
+    private ushort _bgShifterAttribHi  = 0x0000;
+    
+    private Status _status;
+    private Mask _mask;
+    private PpuCtrl _control;
+    
+    private LoopyRegister _vramAddr;
+    private LoopyRegister _tramAddr;
+
+    private byte _fineX = 0x00;
+
+    private byte[][] _tblName = new byte[2][]
+    {
+        new byte[1024],
+        new byte[1024]
+    };
+
+    private byte[] _tblPalette = new byte[32];
+    
+    private byte[][] _tblPattern = new byte[2][]
+    {
+        new byte[4096],
+        new byte[4096]
+    };
+
+    private Vector4[] _palScreen = new Vector4[0x40];
+    private Sprite _sprScreen = new Sprite(256, 240);
+    private Sprite[] _sprNameTable = [new Sprite(256, 240), new Sprite(256, 240)];
+    private Sprite[] _sprPatternTable = [ new Sprite(128, 128), new Sprite(128, 128) ];
+
+    private short _scanline = 0;
+    private short _cycle = 0;
+
+    private byte _bgNextTileId = 0x00;
+    private byte _bgNextTileAttrb = 0x00;
+    private byte _bgNextTileLsb = 0x00;
+    private byte _bgNextTileMsb = 0x00;
+    
+    private byte _addrLatch = 0x00;
+    private byte _ppuDataBuffer = 0x00;
+    
+    private readonly Random _random = new Random();
+
+    public bool FrameComplete;
+    public bool Nmi;
+    
     public Ppu2C02()
     {
         _palScreen[0x00] = new Vector4(84, 84, 84, 255);
@@ -73,5 +122,89 @@ public partial class Ppu2C02
         _palScreen[0x3D] = new Vector4(160, 162, 160, 255);
         _palScreen[0x3E] = new Vector4(0, 0, 0, 255);
         _palScreen[0x3F] = new Vector4(0, 0, 0, 255);
+    }
+
+    private void IncrementScrollX()
+    {
+        if (_mask.renderBackground || _mask.renderSprites)
+        {
+            if (_vramAddr.CoarseX == 31)
+            {
+                _vramAddr.CoarseX = 0;
+                _vramAddr.NametableX = !_vramAddr.NametableX;
+            }
+            else
+            {
+                _vramAddr.CoarseX++;
+            }
+        }
+    }
+
+    private void IncrementScrollY()
+    {
+        if (_mask.renderBackground || _mask.renderSprites)
+        {
+            if (_vramAddr.FineY < 7)
+            {
+                _vramAddr.FineY++;
+            }
+            else
+            {
+                _vramAddr.FineY = 0;
+
+                if (_vramAddr.CoarseY == 29)
+                {
+                    _vramAddr.CoarseY = 0;
+                    _vramAddr.NametableY = !_vramAddr.NametableY;
+                }
+                else if (_vramAddr.CoarseY == 31)
+                {
+                    _vramAddr.CoarseY = 0;
+                }
+                else
+                {
+                    _vramAddr.CoarseY++;
+                }
+            }
+        }
+    }
+
+    private void TransferAddressX()
+    {
+        if (_mask.renderBackground || _mask.renderSprites)
+        {
+            _vramAddr.NametableX = _tramAddr.NametableX;
+            _vramAddr.CoarseX = _tramAddr.CoarseX;
+        }
+    }
+
+    private void TransferAddressY()
+    {
+        if (_mask.renderBackground || _mask.renderSprites)
+        {
+            _vramAddr.FineY = _tramAddr.FineY;
+            _vramAddr.NametableY = _tramAddr.NametableY;
+            _vramAddr.CoarseY = _tramAddr.CoarseY;
+        }
+    }
+
+    private void LoadBackgroundShifters()
+    {
+        _bgShifterPatternLo = (ushort)((_bgShifterPatternLo & 0xFF00) | _bgNextTileLsb);
+        _bgShifterPatternHi = (ushort)((_bgShifterPatternHi & 0xFF00) | _bgNextTileMsb);
+
+        _bgShifterAttribLo = (ushort)((_bgShifterAttribLo & 0xFF00) | ((_bgNextTileAttrb & 0b01) != 0 ? 0xFF : 0x00));
+        _bgShifterAttribHi = (ushort)((_bgShifterAttribHi & 0xFF00) | ((_bgNextTileAttrb & 0b10) != 0 ? 0xFF : 0x00));
+    }
+
+    private void UpdateShifters()
+    {
+        if (_mask.renderBackground)
+        {
+            _bgShifterPatternLo <<= 1;
+            _bgShifterPatternHi <<= 1;
+            _bgShifterAttribLo <<= 1;
+            _bgShifterAttribHi <<= 1;
+        }
     }
 }
