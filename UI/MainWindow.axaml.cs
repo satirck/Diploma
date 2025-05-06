@@ -32,7 +32,7 @@ public partial class MainWindow : Window
     private Bus _nes;
     private Cartridge _cart;
 
-    private string _path = "/home/miki/Downloads/nestest.nes";
+    private string _path = "/home/miki/work/NesRoms/" + "nestest.nes";
     private bool _isEmuRunning = false;
 
     private byte _selectedPallet = 0;

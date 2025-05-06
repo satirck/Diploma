@@ -9,6 +9,9 @@ public class Bus: AbstractBus, IBus
 
     public Ppu2C02 Ppu;
     private Cartridge.Cartridge _cart;
+
+    public byte[] Controller = [0, 0];
+    private byte[] _controllerState = [0, 0];
     
     public Bus()
     {
@@ -23,7 +26,9 @@ public class Bus: AbstractBus, IBus
 
     public void Reset()
     {
+        _cart.Reset();
         Cpu.Reset();
+        Ppu.Reset();
         _nSystemClockCounter = 0;
     }
 
