@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Text;
 using System.Timers;
 using Avalonia;
@@ -19,7 +20,6 @@ namespace UI;
 public partial class MainWindow : Window
 {
     private TextBlock _cpuInfoTextBlock;
-    private Grid _mainGrid;
     private StackPanel _flagsPanel;
 
     private Image _screenImage;
@@ -36,10 +36,12 @@ public partial class MainWindow : Window
     private bool _isEmuRunning = false;
 
     private byte _selectedPallet = 0;
+    private Dictionary<ushort, string> _asmMap;
 
     public MainWindow()
     {
         InitializeComponent();
+        DisassemblyTextBlock = this.FindControl<TextBlock>("DisassemblyTextBlock");
         KeyDown += OnKeyDown;
 
         MinWidth = 600;
@@ -53,8 +55,11 @@ public partial class MainWindow : Window
 
         _nes.Cpu.Reset();
 
-        _mainGrid = this.FindControl<Grid>("MainGrid") ?? throw new Exception("Main grid cannot be created");
-        SetupUi();
+        _screenImage = ScreenImage;
+        _cpuInfoTextBlock = CpuInfoTextBlock;
+        _flagsPanel = FlagsPanel;
+        _patternTable0Image = PatternTable0Image;
+        _patternTable1Image = PatternTable1Image;
 
         _updateTimer = new Timer(16);
         _updateTimer.Elapsed += (_, _) => Dispatcher.UIThread.Post(UpdateCpuInfo);
@@ -113,128 +118,6 @@ public partial class MainWindow : Window
             _nes.Ppu.FrameComplete = false;
         }
     }
-
-    private void SetupUi()
-    {
-        _mainGrid.RowDefinitions.Add(new RowDefinition(GridLength.Star));
-        _mainGrid.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Star));
-        _mainGrid.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(2)));
-        _mainGrid.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(200)));
-
-        // === ЭКРАН NES ===
-        _screenImage = new Image
-        {
-            Width = 512, 
-            Height = 480,
-            HorizontalAlignment = HorizontalAlignment.Left,
-            VerticalAlignment = VerticalAlignment.Top,
-            Stretch = Stretch.None,
-        };
-        
-        int width = 512; // Ширина экрана 2x
-        int height = 480; 
-
-        _bitmap = new WriteableBitmap(
-            new PixelSize(width, height),
-            new Vector(96, 96),
-            Avalonia.Platform.PixelFormat.Bgra8888,
-            Avalonia.Platform.AlphaFormat.Unpremul);
-
-        using (var fb = _bitmap.Lock())
-        {
-            unsafe
-            {
-                uint* buffer = (uint*)fb.Address;
-                uint red = 0xFFFF0000;
-
-                for (int i = 0; i < width * height; i++)
-                    buffer[i] = red;
-            }
-        }
-
-        _screenImage.Source = _bitmap;
-
-        var imageContainer = new Grid
-        {
-            HorizontalAlignment = HorizontalAlignment.Left,
-            VerticalAlignment = VerticalAlignment.Top,
-        };
-
-        imageContainer.Children.Add(_screenImage);
-
-        _mainGrid.Children.Add(imageContainer);
-        Grid.SetColumn(imageContainer, 0);
-        Grid.SetRow(imageContainer, 0);
-
-        // === СЕПАРАТОР ===
-        var separator = new Border
-        {
-            Background = Brushes.Gray,
-            Width = 2,
-            VerticalAlignment = VerticalAlignment.Stretch
-        };
-
-        _mainGrid.Children.Add(separator);
-        Grid.SetColumn(separator, 1);
-        Grid.SetRow(separator, 0);
-
-        // === CPU INFO + Pattern Tables ===
-
-        _cpuInfoTextBlock = new TextBlock
-        {
-            Text = "CPU Info",
-            FontSize = 14,
-            HorizontalAlignment = HorizontalAlignment.Left,
-            VerticalAlignment = VerticalAlignment.Top,
-            TextWrapping = TextWrapping.Wrap,
-            Margin = new Thickness(10)
-        };
-
-        _flagsPanel = new StackPanel
-        {
-            Orientation = Orientation.Vertical,
-            Margin = new Thickness(10)
-        };
-
-        _patternTable0Image = new Image
-        {
-            Width = 128,
-            Height = 128,
-            Margin = new Thickness(5)
-        };
-
-        _patternTable1Image = new Image
-        {
-            Width = 128,
-            Height = 128,
-            Margin = new Thickness(5)
-        };
-
-        var patternTablePanel = new StackPanel
-        {
-            Orientation = Orientation.Vertical,
-            Children = { _patternTable0Image, _patternTable1Image },
-            Margin = new Thickness(10)
-        };
-
-        var cpuInfoPanel = new StackPanel
-        {
-            Children = { _cpuInfoTextBlock, _flagsPanel, patternTablePanel },
-            Margin = new Thickness(10)
-        };
-
-        // Обернём всё в ScrollViewer, чтобы содержимое не обрезалось
-        var scrollViewer = new ScrollViewer
-        {
-            Content = cpuInfoPanel,
-            VerticalScrollBarVisibility = ScrollBarVisibility.Auto
-        };
-
-        _mainGrid.Children.Add(scrollViewer);
-        Grid.SetColumn(scrollViewer, 2);
-        Grid.SetRow(scrollViewer, 0);
-    }
-
 
     private void RenderSpriteToImage(Sprite sprite)
     {
@@ -304,6 +187,35 @@ public partial class MainWindow : Window
         }
 
         Dispatcher.UIThread.Post(() => { imageControl.Source = bitmap; });
+    }
+
+    private Dictionary<ushort, string> DisassembleAround(ushort pc, int before = 5, int after = 5)
+    {
+        var map = new Dictionary<ushort, string>();
+
+        // Дизассемблируем назад: максимум 20 байт до pc
+        ushort scanStart = (ushort)(pc > 0x20 ? pc - 0x20 : 0x0000);
+        var tempMap = _nes.Cpu.Disassemble(scanStart, (ushort)(pc + 0x20));
+
+        // Собираем ключи в список и ищем точное положение PC
+        var keys = new List<ushort>(tempMap.Keys);
+        keys.Sort();
+
+        int pcIndex = keys.FindIndex(k => k == pc);
+        if (pcIndex == -1)
+            pcIndex = keys.FindLastIndex(k => k < pc); // ищем ближайшую предыдущую
+
+        // Гарантируем границы
+        int startIndex = Math.Max(pcIndex - before, 0);
+        int endIndex = Math.Min(pcIndex + after, keys.Count - 1);
+
+        // Только нужные строки
+        for (int i = startIndex; i <= endIndex; i++)
+        {
+            map[keys[i]] = tempMap[keys[i]];
+        }
+
+        return map;
     }
 
     private void UpdateCpuInfo()
@@ -381,7 +293,23 @@ public partial class MainWindow : Window
         var screen = _nes.Ppu.GetScreen();
         RenderSpriteToImage(screen);
 
-        // RenderPatternTable(_nes.Ppu.GetPatternTable(0, _selectedPallet), _patternTable0Image);
-        // RenderPatternTable(_nes.Ppu.GetPatternTable(1, _selectedPallet), _patternTable1Image);
+        RenderPatternTable(_nes.Ppu.GetPatternTable(0, _selectedPallet), _patternTable0Image);
+        RenderPatternTable(_nes.Ppu.GetPatternTable(1, _selectedPallet), _patternTable1Image);
+        
+        _asmMap = DisassembleAround(_nes.Cpu.Pc, 10, 10);
+
+        ushort pc = _nes.Cpu.Pc;
+
+        var disasmSb = new StringBuilder();
+
+        foreach (var line in _asmMap)
+        {
+            if (line.Key == pc)
+                disasmSb.AppendLine($"> {line.Value}");
+            else
+                disasmSb.AppendLine($"  {line.Value}");
+        }
+
+        DisassemblyTextBlock.Text = disasmSb.ToString();
     }
 }
