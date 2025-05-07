@@ -1,5 +1,6 @@
 using System.Runtime.InteropServices;
 using Devices.Mapper.Impl;
+using Devices.PPU;
 
 namespace Devices.Cartridge;
 
@@ -14,9 +15,11 @@ public class Cartridge
     private byte _nPrgBanks = 0;
     private byte _nChrBanks = 0;
     
-    private Mapper _mapper;
+    private Mapper? _mapper;
     
     private bool _bImageValid = false;
+
+    public Mirror Mirror;
 
     public Cartridge(String cartridgePath)
     {
@@ -24,7 +27,7 @@ public class Cartridge
         using (var reader = new BinaryReader(fs))
         {
             Header header = new Header();
-            header.Name = reader.ReadChars(4);
+            header.Name = reader.ReadBytes(4);
             header.PrgRomChunks = reader.ReadByte();
             header.ChrRomChunks = reader.ReadByte();
             header.Mapper1 = reader.ReadByte();
@@ -38,6 +41,7 @@ public class Cartridge
                 reader.BaseStream.Seek(512, SeekOrigin.Current);
             
             _nMapperId = (byte)(((header.Mapper2 >> 4) << 4) | (header.Mapper1 >> 4));
+            Mirror = (header.Mapper1 & 0x01) != 0 ? Mirror.Vertical : Mirror.Horizontal;
             
             byte nFileType = 1;
 
@@ -50,7 +54,8 @@ public class Cartridge
                 _vPrgMemory.AddRange(reader.ReadBytes(_vPrgMemory.Capacity));
 
                 _nChrBanks = header.ChrRomChunks;
-                _vChrMemory = new List<byte>(_nChrBanks * 8192);
+                if (_nChrBanks == 0) _vChrMemory = new List<byte>(8192);
+                else _vChrMemory.AddRange(reader.ReadBytes(_nChrBanks * 8192));
                 _vChrMemory.AddRange(reader.ReadBytes(_vChrMemory.Capacity));
             }
             else if (nFileType == 2) 
@@ -60,16 +65,20 @@ public class Cartridge
         switch (_nMapperId)
         {
             case 0: _mapper = new Mapper000(_nPrgBanks, _nChrBanks); break;
-            default: throw new Exception($"Mapper with id=[{_nMapperId}] not implemented yet");
         }
 
         _bImageValid = true;
+    }
+
+    public bool ImageValid()
+    {
+        return _bImageValid;
     }
     
     public bool CpuRead(ushort addr, ref byte data, bool bReadOnly = false)
     {
         uint mappedAddr = 0;
-        if (_mapper.CpuMapRead(addr, ref mappedAddr))
+        if (_mapper != null && _mapper.CpuMapRead(addr, ref mappedAddr))
         {
             data = _vPrgMemory[(int)mappedAddr];    
             return true;
@@ -81,7 +90,7 @@ public class Cartridge
     public bool CpuWrite(ushort addr, byte data)
     {
         uint mappedAddr = 0;
-        if (_mapper.CpuMapWrite(addr, ref mappedAddr))
+        if (_mapper != null && _mapper.CpuMapWrite(addr, ref mappedAddr))
         {
             _vPrgMemory[(int)mappedAddr] = data;    
             return true;
@@ -93,7 +102,7 @@ public class Cartridge
     public bool PpuRead(ushort addr, ref byte data, bool bReadOnly = false)
     {
         uint mappedAddr = 0;
-        if (_mapper.PpuMapRead(addr, ref mappedAddr))
+        if (_mapper != null && _mapper.PpuMapRead(addr, ref mappedAddr))
         {
             data = _vChrMemory[(int)mappedAddr];    
             return true;
@@ -105,7 +114,7 @@ public class Cartridge
     public bool PpuWrite(ushort addr, byte data)
     {
         uint mappedAddr = 0;
-        if (_mapper.PpuMapWrite(addr, ref mappedAddr))
+        if (_mapper != null && _mapper.PpuMapWrite(addr, ref mappedAddr))
         {
             _vChrMemory[(int)mappedAddr] = data;    
             return true;
@@ -113,11 +122,19 @@ public class Cartridge
         
         return false;
     }
+
+    public void Reset()
+    {
+        if (_mapper != null)
+        {
+            _mapper.Reset();
+        }
+    }
     
     private struct Header
     {
         [MarshalAs(UnmanagedType.ByValArray, SizeConst = 4)]
-        public char[] Name;
+        public byte[] Name;
         public byte PrgRomChunks;
         public byte ChrRomChunks;
         public byte Mapper1;

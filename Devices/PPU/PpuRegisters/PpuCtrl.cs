@@ -1,6 +1,6 @@
 using System.Runtime.InteropServices;
 
-namespace Devices.PPU;
+namespace Devices.PPU.PpuRegisters;
 
 [StructLayout(LayoutKind.Explicit)]
 public struct PpuCtrl
