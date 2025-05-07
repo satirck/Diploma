@@ -33,8 +33,8 @@ public partial class Ppu2C02
     private Sprite[] _sprNameTable = [new Sprite(256, 240), new Sprite(256, 240)];
     private Sprite[] _sprPatternTable = [ new Sprite(128, 128), new Sprite(128, 128) ];
 
-    public bool FrameComplete;
-    public bool Nmi;
+    public bool FrameComplete = false;
+    public bool Nmi = false;
 
     public Ppu2C02()
     {

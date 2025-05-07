@@ -8,12 +8,11 @@
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="*" /> <!-- Эмуляторный экран -->
-            <ColumnDefinition Width="2" /> <!-- Разделитель -->
-            <ColumnDefinition Width="300" /> <!-- CPU / PPU info -->
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="2" />
+            <ColumnDefinition Width="300" />
         </Grid.ColumnDefinitions>
 
-        <!-- NES экран -->
         <Grid Grid.Column="0">
             <Image Name="ScreenImage"
                    Width="512" Height="480"
@@ -22,13 +21,11 @@
                    Stretch="Fill"/>
         </Grid>
 
-        <!-- Разделитель -->
         <Border Grid.Column="1"
                 Background="Gray"
                 Width="2"
                 VerticalAlignment="Stretch" />
 
-        <!-- CPU Info и PPU таблицы -->
         <ScrollViewer Grid.Column="2"
                       VerticalScrollBarVisibility="Auto">
             <StackPanel Margin="10">
@@ -38,9 +35,17 @@
                            TextWrapping="Wrap"
                            Margin="0,0,0,10"/>
 
+                <!-- Флаги -->
                 <StackPanel Name="FlagsPanel"
                             Orientation="Vertical"
-                            Margin="0,0,0,10"/>
+                            Margin="0,0,0,10">
+                    <StackPanel Name="FlagsNamesRow"
+                                Orientation="Horizontal"
+                                HorizontalAlignment="Left"/>
+                    <StackPanel Name="FlagsValuesRow"
+                                Orientation="Horizontal"
+                                HorizontalAlignment="Left"/>
+                </StackPanel>
 
                 <StackPanel Orientation="Horizontal"
                             HorizontalAlignment="Left">

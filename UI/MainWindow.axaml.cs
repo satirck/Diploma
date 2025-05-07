@@ -5,9 +5,7 @@ using System.Text;
 using System.Timers;
 using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Controls.Primitives;
 using Avalonia.Input;
-using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Threading;
@@ -21,7 +19,9 @@ namespace UI;
 public partial class MainWindow : Window
 {
     private TextBlock _cpuInfoTextBlock;
-    private StackPanel _flagsPanel;
+    private StackPanel _flagsNamesRow;
+    private StackPanel _flagsValuesRow;
+    private List<TextBlock> _flagValueBlocks;
 
     private Image _screenImage;
     private WriteableBitmap _bitmap;
@@ -41,15 +41,11 @@ public partial class MainWindow : Window
 
     public MainWindow()
     {
-        var logFilePath = "log.txt";
-        var fileStream = new FileStream(logFilePath, FileMode.Create, FileAccess.Write);
-        var streamWriter = new StreamWriter(fileStream)
-        {
-            AutoFlush = true
-        };
-        Console.SetOut(streamWriter);
+        // var logFilePath = "log.txt";
+        // var fileStream = new FileStream(logFilePath, FileMode.Create, FileAccess.Write);
+        // var streamWriter = new StreamWriter(fileStream) { AutoFlush = true };
+        // Console.SetOut(streamWriter);
 
-        
         InitializeComponent();
         DisassemblyTextBlock = this.FindControl<TextBlock>("DisassemblyTextBlock");
         KeyDown += OnKeyDown;
@@ -62,18 +58,64 @@ public partial class MainWindow : Window
 
         _cart = new Cartridge(_path);
         _nes.InsertCartridge(_cart);
-
         _nes.Cpu.Reset();
 
         _screenImage = ScreenImage;
         _cpuInfoTextBlock = CpuInfoTextBlock;
-        _flagsPanel = FlagsPanel;
         _patternTable0Image = PatternTable0Image;
         _patternTable1Image = PatternTable1Image;
+
+        _flagsNamesRow = this.FindControl<StackPanel>("FlagsNamesRow")!;
+        _flagsValuesRow = this.FindControl<StackPanel>("FlagsValuesRow")!;
+
+        InitFlagUI();
+        UpdatePatternTable();
 
         _updateTimer = new Timer(16);
         _updateTimer.Elapsed += (_, _) => Dispatcher.UIThread.Post(UpdateCpuInfo);
         _updateTimer.Start();
+    }
+
+    private void InitFlagUI()
+    {
+        var flagNames = new[] { "N", "V", "U", "B", "D", "I", "Z", "C" };
+        _flagValueBlocks = new List<TextBlock>();
+
+        foreach (var name in flagNames)
+        {
+            _flagsNamesRow.Children.Add(new TextBlock
+            {
+                Text = name,
+                Margin = new Thickness(4, 0),
+                FontWeight = FontWeight.Bold
+            });
+
+            var valBlock = new TextBlock
+            {
+                Text = "0",
+                Margin = new Thickness(4, 0),
+                FontWeight = FontWeight.Bold
+            };
+
+            _flagValueBlocks.Add(valBlock);
+            _flagsValuesRow.Children.Add(valBlock);
+        }
+    }
+
+    private void UpdateFlagUi(byte status)
+    {
+        var flagValues = new[]
+        {
+            Flags6502.N, Flags6502.V, Flags6502.U, Flags6502.B,
+            Flags6502.D, Flags6502.I, Flags6502.Z, Flags6502.C
+        };
+
+        for (int i = 0; i < flagValues.Length; i++)
+        {
+            bool isSet = (status & (byte)flagValues[i]) != 0;
+            _flagValueBlocks[i].Text = isSet ? "1" : "0";
+            _flagValueBlocks[i].Foreground = isSet ? Brushes.Green : Brushes.Red;
+        }
     }
 
     private void OnKeyDown(object? sender, KeyEventArgs e)
@@ -93,46 +135,36 @@ public partial class MainWindow : Window
         {
             ++_selectedPallet;
             _selectedPallet &= 0x07;
+
+            UpdatePatternTable();
         }
 
-        if (_isEmuRunning)
-        {
-            return;
-        }
+        if (_isEmuRunning) return;
 
         if (e.Key == Key.C)
         {
-            do
-            {
-                _nes.Clock();
-            } while (!_nes.Cpu.Complete());
-
-            do
-            {
-                _nes.Clock();
-            } while (_nes.Cpu.Complete());
+            do { _nes.Clock(); } while (!_nes.Cpu.Complete());
+            do { _nes.Clock(); } while (_nes.Cpu.Complete());
         }
 
         if (e.Key == Key.F)
         {
-            do
-            {
-                _nes.Clock();
-            } while (!_nes.Ppu.FrameComplete);
-
-            do
-            {
-                _nes.Clock();
-            } while (!_nes.Cpu.Complete());
-
+            do { _nes.Clock(); } while (!_nes.Ppu.FrameComplete);
+            do { _nes.Clock(); } while (!_nes.Cpu.Complete());
             _nes.Ppu.FrameComplete = false;
         }
     }
 
+    private void UpdatePatternTable()
+    {
+        RenderPatternTable(_nes.Ppu.GetPatternTable(0, _selectedPallet), _patternTable0Image);
+        RenderPatternTable(_nes.Ppu.GetPatternTable(1, _selectedPallet), _patternTable1Image);
+    }
+
     private void RenderSpriteToImage(Sprite sprite)
     {
-        var width = 256;
-        var height = 240;
+        const int width = 256;
+        const int height = 240;
 
         if (sprite.PColData.Count != width * height)
         {
@@ -146,22 +178,13 @@ public partial class MainWindow : Window
             Avalonia.Platform.PixelFormat.Bgra8888,
             Avalonia.Platform.AlphaFormat.Unpremul);
 
-        using (var fb = _bitmap.Lock())
+        using var fb = _bitmap.Lock();
+        unsafe
         {
-            unsafe
-            {
-                uint* buffer = (uint*)fb.Address;
-
-                for (int y = 0; y < height; y++)
-                {
-                    for (int x = 0; x < width; x++)
-                    {
-                        var color = sprite.PColData[y * width + x];
-
-                        buffer[y * width + x] = color.ToUInt32();
-                    }
-                }
-            }
+            uint* buffer = (uint*)fb.Address;
+            for (int y = 0; y < height; y++)
+            for (int x = 0; x < width; x++)
+                buffer[y * width + x] = sprite.PColData[y * width + x].ToBgra8888();
         }
 
         Dispatcher.UIThread.Post(() => { _screenImage.Source = _bitmap; });
@@ -169,8 +192,7 @@ public partial class MainWindow : Window
 
     private void RenderPatternTable(Sprite sprite, Image imageControl)
     {
-        int width = 128;
-        int height = 128;
+        int width = 128, height = 128;
 
         var bitmap = new WriteableBitmap(
             new PixelSize(width, height),
@@ -178,22 +200,13 @@ public partial class MainWindow : Window
             Avalonia.Platform.PixelFormat.Bgra8888,
             Avalonia.Platform.AlphaFormat.Unpremul);
 
-        using (var fb = bitmap.Lock())
+        using var fb = bitmap.Lock();
+        unsafe
         {
-            unsafe
-            {
-                uint* buffer = (uint*)fb.Address;
-
-                for (int y = 0; y < height; y++)
-                {
-                    for (int x = 0; x < width; x++)
-                    {
-                        var color = sprite.PColData[y * width + x];
-
-                        buffer[y * width + x] = color.ToUInt32();
-                    }
-                }
-            }
+            uint* buffer = (uint*)fb.Address;
+            for (int y = 0; y < height; y++)
+            for (int x = 0; x < width; x++)
+                buffer[y * width + x] = sprite.PColData[y * width + x].ToBgra8888();
         }
 
         Dispatcher.UIThread.Post(() => { imageControl.Source = bitmap; });
@@ -202,28 +215,20 @@ public partial class MainWindow : Window
     private Dictionary<ushort, string> DisassembleAround(ushort pc, int before = 5, int after = 5)
     {
         var map = new Dictionary<ushort, string>();
-
-        // Дизассемблируем назад: максимум 20 байт до pc
         ushort scanStart = (ushort)(pc > 0x20 ? pc - 0x20 : 0x0000);
         var tempMap = _nes.Cpu.Disassemble(scanStart, (ushort)(pc + 0x20));
-
-        // Собираем ключи в список и ищем точное положение PC
         var keys = new List<ushort>(tempMap.Keys);
         keys.Sort();
 
         int pcIndex = keys.FindIndex(k => k == pc);
         if (pcIndex == -1)
-            pcIndex = keys.FindLastIndex(k => k < pc); // ищем ближайшую предыдущую
+            pcIndex = keys.FindLastIndex(k => k < pc);
 
-        // Гарантируем границы
         int startIndex = Math.Max(pcIndex - before, 0);
         int endIndex = Math.Min(pcIndex + after, keys.Count - 1);
 
-        // Только нужные строки
         for (int i = startIndex; i <= endIndex; i++)
-        {
             map[keys[i]] = tempMap[keys[i]];
-        }
 
         return map;
     }
@@ -232,24 +237,15 @@ public partial class MainWindow : Window
     {
         if (_isEmuRunning)
         {
-            do
-            {
-                _nes.Clock();
-            } while (!_nes.Ppu.FrameComplete);
-
+            do { _nes.Clock(); } while (!_nes.Ppu.FrameComplete);
             _nes.Ppu.FrameComplete = false;
-            _isEmuRunning = false;
         }
 
         var cpu = _nes.Cpu;
-        var status = cpu.Status;
-
-        byte testResultLow = _nes.CpuRead(0x0002);
-        byte testResultHigh = _nes.CpuRead(0x0003);
-        ushort testResult = (ushort)(testResultLow | (testResultHigh << 8));
-
-        // Обновляем текст CPU
         var sb = new StringBuilder();
+
+        ushort testResult = (ushort)(_nes.CpuRead(0x0002) | (_nes.CpuRead(0x0003) << 8));
+
         sb.AppendLine($"A  = 0x{cpu.A:X2}");
         sb.AppendLine($"X  = 0x{cpu.X:X2}");
         sb.AppendLine($"Y  = 0x{cpu.Y:X2}");
@@ -258,68 +254,16 @@ public partial class MainWindow : Window
         sb.AppendLine($"Opcode = {cpu.Lookup[cpu.Opcode].Name}");
         sb.AppendLine($"Test Result: 0x{testResult:X4}");
 
-        var flagNames = new[] { "N", "V", "U", "B", "D", "I", "Z", "C" };
-        var flagValues = new[]
-        {
-            Flags6502.N, Flags6502.V, Flags6502.U, Flags6502.B,
-            Flags6502.D, Flags6502.I, Flags6502.Z, Flags6502.C
-        };
-
         _cpuInfoTextBlock.Text = sb.ToString();
+        UpdateFlagUi(cpu.Status);
 
-        // Обновляем панель флагов с цветным отображением
-        _flagsPanel.Children.Clear();
+        RenderSpriteToImage(_nes.Ppu.GetScreen());
 
-        var flagsRow = new StackPanel { Orientation = Orientation.Horizontal };
-        var valuesRow = new StackPanel { Orientation = Orientation.Horizontal };
-
-        for (int i = 0; i < flagNames.Length; i++)
-        {
-            bool isSet = (status & (byte)flagValues[i]) != 0;
-            var color = isSet ? Brushes.Green : Brushes.Red;
-
-            var flagText = new TextBlock
-            {
-                Text = flagNames[i],
-                Foreground = color,
-                FontWeight = FontWeight.Bold,
-                Margin = new Thickness(4, 0)
-            };
-
-            var valueText = new TextBlock
-            {
-                Text = isSet ? "1" : "0",
-                Foreground = color,
-                FontWeight = FontWeight.Bold,
-                Margin = new Thickness(4, 0)
-            };
-
-            flagsRow.Children.Add(flagText);
-            valuesRow.Children.Add(valueText);
-        }
-
-        _flagsPanel.Children.Add(flagsRow);
-        _flagsPanel.Children.Add(valuesRow);
-
-        var screen = _nes.Ppu.GetScreen();
-        RenderSpriteToImage(screen);
-
-        RenderPatternTable(_nes.Ppu.GetPatternTable(0, _selectedPallet), _patternTable0Image);
-        RenderPatternTable(_nes.Ppu.GetPatternTable(1, _selectedPallet), _patternTable1Image);
-        
-        _asmMap = DisassembleAround(_nes.Cpu.Pc, 10, 10);
-
-        ushort pc = _nes.Cpu.Pc;
+        _asmMap = DisassembleAround(cpu.Pc, 10, 10);
 
         var disasmSb = new StringBuilder();
-
         foreach (var line in _asmMap)
-        {
-            if (line.Key == pc)
-                disasmSb.AppendLine($"> {line.Value}");
-            else
-                disasmSb.AppendLine($"  {line.Value}");
-        }
+            disasmSb.AppendLine(line.Key == cpu.Pc ? $"> {line.Value}" : $"  {line.Value}");
 
         DisassemblyTextBlock.Text = disasmSb.ToString();
     }
