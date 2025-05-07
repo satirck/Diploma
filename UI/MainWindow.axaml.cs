@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Text;
 using System.Timers;
 using Avalonia;
@@ -40,6 +41,15 @@ public partial class MainWindow : Window
 
     public MainWindow()
     {
+        var logFilePath = "log.txt";
+        var fileStream = new FileStream(logFilePath, FileMode.Create, FileAccess.Write);
+        var streamWriter = new StreamWriter(fileStream)
+        {
+            AutoFlush = true
+        };
+        Console.SetOut(streamWriter);
+
+        
         InitializeComponent();
         DisassemblyTextBlock = this.FindControl<TextBlock>("DisassemblyTextBlock");
         KeyDown += OnKeyDown;
@@ -228,6 +238,7 @@ public partial class MainWindow : Window
             } while (!_nes.Ppu.FrameComplete);
 
             _nes.Ppu.FrameComplete = false;
+            _isEmuRunning = false;
         }
 
         var cpu = _nes.Cpu;

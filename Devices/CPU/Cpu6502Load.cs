@@ -579,7 +579,7 @@ public partial class Cpu6502
         Pc++;
 
         AddrAbs = (ushort)((hi << 8) | lo);
-
+        Console.WriteLine($"Cpu: AddrAbs = {AddrAbs}");
         return 0;
     }
 
@@ -1032,6 +1032,7 @@ public partial class Cpu6502
         A = Fetched;
         SetFlag(Flags6502.Z, A == 0x00);
         SetFlag(Flags6502.N, (A & 0x80) != 0);
+        Console.WriteLine($"Cpu.LDA: {A}");
         return 1;
     }
 
