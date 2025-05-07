@@ -1,30 +1,31 @@
+using System.Runtime.InteropServices;
+
 namespace Devices.PPU.PpuRegisters;
 
+[StructLayout(LayoutKind.Explicit)]
 public struct Status
 {
-    public byte Reg; 
-    
-    public byte Unused
-    {
-        get => (byte)((Reg >> 3) & 0x1F); 
-        set => Reg = (byte)((Reg & 0x07) | ((value & 0x1F) << 3)); 
-    }
+    [FieldOffset(0)]
+    public byte reg;
+
+    [FieldOffset(0)]
+    private byte _bits;
 
     public bool SpriteOverflow
     {
-        get => (Reg & 0x04) != 0; 
-        set => Reg = (byte)((Reg & 0xFB) | (value ? 0x04 : 0x00));
+        get => (_bits & (1 << 5)) != 0;
+        set => _bits = (byte)(value ? (_bits | (1 << 5)) : (_bits & ~(1 << 5)));
     }
 
     public bool SpriteZeroHit
     {
-        get => (Reg & 0x02) != 0;
-        set => Reg = (byte)((Reg & 0xFD) | (value ? 0x02 : 0x00));
+        get => (_bits & (1 << 6)) != 0;
+        set => _bits = (byte)(value ? (_bits | (1 << 6)) : (_bits & ~(1 << 6)));
     }
 
     public bool VerticalBlank
     {
-        get => (Reg & 0x01) != 0;
-        set => Reg = (byte)((Reg & 0xFE) | (value ? 0x01 : 0x00));
+        get => (_bits & (1 << 7)) != 0;
+        set => _bits = (byte)(value ? (_bits | (1 << 7)) : (_bits & ~(1 << 7)));
     }
 }

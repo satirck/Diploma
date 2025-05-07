@@ -11,7 +11,7 @@ public partial class Ppu2C02
 
     private Status _status;
     private Mask _mask;
-    private Control _control;
+    private PpuCtrl _control;
     private LoopyRegister _vramAddr;
     private LoopyRegister _tramAddr;
 
@@ -105,9 +105,6 @@ public partial class Ppu2C02
         _palScreen[0x3D] = new Pixel(160, 162, 160);
         _palScreen[0x3E] = new Pixel(0, 0, 0);
         _palScreen[0x3F] = new Pixel(0, 0, 0);
-
-        FrameComplete = false;
-        Nmi = false;
     }
 
     public void ConnectCart(Cartridge.Cartridge cartridge)

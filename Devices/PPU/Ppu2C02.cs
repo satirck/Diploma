@@ -1,9 +1,4 @@
-using System.Diagnostics.CodeAnalysis;
-using System.Numerics;
-
 namespace Devices.PPU;
-
-using Cartridge;
 
 public partial class Ppu2C02
 {
@@ -12,6 +7,20 @@ public partial class Ppu2C02
 
     public void Clock()
     {
+        if (_scanline == -1 && _cycle == -1)
+        {
+            _status.VerticalBlank = false;
+        }
+
+        if (_scanline == 241 && _cycle == 1)
+        {
+            _status.VerticalBlank = true;
+            if (_control.enableNmi)
+            {
+                Nmi = true;
+            }
+        }
+
         // Fake some noise for now
         _sprScreen.SetPixel(_cycle - 1, _scanline, _palScreen[(_random.Next() % 2 != 0) ? 0x3F : 0x30]);
 
@@ -46,18 +55,18 @@ public partial class Ppu2C02
             for (byte nTileX = 0; nTileX < 16; nTileX++)
             {
                 ushort nOffset = (ushort)(nTileY * 256 + nTileX * 16);
-        
+
                 for (byte row = 0; row < 8; row++)
                 {
                     byte tileLsb = PpuRead((ushort)(i * 0x1000 + nOffset + row + 0));
                     byte tileMsb = PpuRead((ushort)(i * 0x1000 + nOffset + row + 8));
-        
+
                     for (byte col = 0; col < 8; col++)
                     {
                         byte pixel = (byte)((tileLsb & 0x01) + (tileMsb & 0x01));
                         tileLsb >>= 1;
                         tileMsb >>= 1;
-        
+
                         _sprPatternTable[i].SetPixel(
                             nTileX * 8 + (7 - col),
                             nTileY * 8 + row,
@@ -88,8 +97,7 @@ public partial class Ppu2C02
             case 0x0001: // Mask
                 break;
             case 0x0002: // Status
-                _status.VerticalBlank = true;
-                data = (byte)((_status.Reg & 0xE0) | (_ppuDataBuffer & 0x1F));
+                data = (byte)((_status.reg & 0xE0) | (_ppuDataBuffer & 0x1F));
                 _status.VerticalBlank = false;
                 _addressLatch = 0;
                 break;
@@ -121,7 +129,7 @@ public partial class Ppu2C02
                 _control.reg = data;
                 break;
             case 0x0001: // Mask
-                _mask.Reg = data;
+                _mask.reg = data;
                 break;
             case 0x0002: // Status
                 break;
@@ -142,6 +150,7 @@ public partial class Ppu2C02
                     _ppuAddr = (ushort)((_ppuAddr & 0xFF00) | data);
                     _addressLatch = 0;
                 }
+
                 break;
             case 0x0007: // PPU Data
                 PpuWrite(_ppuAddr, data);
@@ -160,11 +169,10 @@ public partial class Ppu2C02
         }
         else if (addr <= 0x1FFF)
         {
-            data = _tblPattern[(addr & 0x1000) >> 12, addr & 0x0FFF]; 
+            data = _tblPattern[(addr & 0x1000) >> 12, addr & 0x0FFF];
         }
         else if (addr <= 0x3EFF)
         {
-            
         }
         else if (addr <= 0x3FFF)
         {
@@ -175,7 +183,7 @@ public partial class Ppu2C02
             if (addr == 0x001C) addr = 0x000C;
             data = _tblPalette[addr];
         }
-        
+
         return data;
     }
 
@@ -187,11 +195,10 @@ public partial class Ppu2C02
         }
         else if (addr <= 0x1FFF)
         {
-           _tblPattern[(addr & 0x1000) >> 12, addr & 0x0FFF] = data; 
+            _tblPattern[(addr & 0x1000) >> 12, addr & 0x0FFF] = data;
         }
         else if (addr <= 0x3EFF)
         {
-            
         }
         else if (addr <= 0x3FFF)
         {
