@@ -54,11 +54,9 @@ public partial class MainWindow : Window
         MinHeight = 600;
 
         _nes = new Bus();
-        _nes.Ppu = new Ppu2C02();
 
         _cart = new Cartridge(_path);
         _nes.InsertCartridge(_cart);
-        _nes.Cpu.Reset();
 
         _screenImage = ScreenImage;
         _cpuInfoTextBlock = CpuInfoTextBlock;

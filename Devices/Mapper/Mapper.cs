@@ -1,4 +1,8 @@
+using Devices.PPU;
+
 namespace Devices.Mapper;
+
+using static Mirror;
 
 public abstract class Mapper
 {
@@ -15,5 +19,26 @@ public abstract class Mapper
     public abstract bool CpuMapWrite(ushort addr, ref uint mappedAddr);
     public abstract bool PpuMapRead(ushort addr, ref uint mappedAddr);
     public abstract bool PpuMapWrite(ushort addr, ref uint mappedAddr);
-    public abstract void Reset();
+
+    public virtual void Reset()
+    {
+    }
+
+    public virtual Mirror Mirror()
+    {
+        return Hardware;
+    }
+
+    public virtual bool IrqState()
+    {
+        return false;
+    }
+
+    public virtual void IrqClear()
+    {
+    }
+
+    public virtual void Scanline()
+    {
+    }
 }
