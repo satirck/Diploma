@@ -579,7 +579,7 @@ public partial class Cpu6502
         Pc++;
 
         AddrAbs = (ushort)((hi << 8) | lo);
-
+        // Console.WriteLine($"Cpu: AddrAbs = {AddrAbs}");
         return 0;
     }
 
@@ -1032,6 +1032,7 @@ public partial class Cpu6502
         A = Fetched;
         SetFlag(Flags6502.Z, A == 0x00);
         SetFlag(Flags6502.N, (A & 0x80) != 0);
+        // Console.WriteLine($"Cpu.LDA: {A}");
         return 1;
     }
 
@@ -1323,6 +1324,7 @@ public partial class Cpu6502
         ushort hi = Read((ushort)(AddrAbs + 1));
 
         Pc = (ushort)((hi << 8) | lo);
+        
         AddRel = AddrAbs = 0x0000;
         Fetched = 0x00;
 
@@ -1374,5 +1376,104 @@ public partial class Cpu6502
         Pc = (ushort)((hi << 8) | lo);
 
         Cycles = 8;
+    }
+    
+    public Dictionary<ushort, string> Disassemble(ushort nStart, ushort nStop)
+    {
+        ushort addr = nStart;
+        byte value = 0x00, lo = 0x00, hi = 0x00;
+        var mapLines = new Dictionary<ushort, string>();
+        ushort lineAddr = 0;
+
+        // Утилита для преобразования чисел в строку в шестнадцатеричной системе
+        string Hex(uint n, byte d)
+        {
+            return n.ToString("X" + d);
+        }
+
+        while (addr <= (uint)nStop)
+        {
+            lineAddr = (ushort)addr;
+            string sInst = "$" + Hex(addr, 4) + ": ";
+
+            // Чтение инструкции
+            byte opcode = _bus.CpuRead(addr, true); 
+            addr++;
+            sInst += Lookup[opcode].Name + " ";
+
+            // Получение операндов в зависимости от режима адресации
+            if (Lookup[opcode].AddrMode == Imp)
+            {
+                sInst += " {IMP}";
+            }
+            else if (Lookup[opcode].AddrMode == Imm)
+            {
+                value = _bus.CpuRead(addr, true); addr++;
+                sInst += "#$" + Hex(value, 2) + " {IMM}";
+            }
+            else if (Lookup[opcode].AddrMode == Zp0)
+            {
+                lo = _bus.CpuRead(addr, true); addr++;
+                hi = 0x00;
+                sInst += "$" + Hex(lo, 2) + " {ZP0}";
+            }
+            else if (Lookup[opcode].AddrMode == Zpx)
+            {
+                lo = _bus.CpuRead(addr, true); addr++;
+                hi = 0x00;
+                sInst += "$" + Hex(lo, 2) + ", X {ZPX}";
+            }
+            else if (Lookup[opcode].AddrMode == Zpy)
+            {
+                lo = _bus.CpuRead(addr, true); addr++;
+                hi = 0x00;
+                sInst += "$" + Hex(lo, 2) + ", Y {ZPY}";
+            }
+            else if (Lookup[opcode].AddrMode == Izx)
+            {
+                lo = _bus.CpuRead(addr, true); addr++;
+                hi = 0x00;
+                sInst += "($" + Hex(lo, 2) + ", X) {IZX}";
+            }
+            else if (Lookup[opcode].AddrMode == Izy)
+            {
+                lo = _bus.CpuRead(addr, true); addr++;
+                hi = 0x00;
+                sInst += "($" + Hex(lo, 2) + "), Y {IZY}";
+            }
+            else if (Lookup[opcode].AddrMode == Abs)
+            {
+                lo = _bus.CpuRead(addr, true); addr++;
+                hi = _bus.CpuRead(addr, true); addr++;
+                sInst += "$" + Hex((ushort)((hi << 8) | lo), 4) + " {ABS}";
+            }
+            else if (Lookup[opcode].AddrMode == Abx)
+            {
+                lo = _bus.CpuRead(addr, true); addr++;
+                hi = _bus.CpuRead(addr, true); addr++;
+                sInst += "$" + Hex((ushort)((hi << 8) | lo), 4) + ", X {ABX}";
+            }
+            else if (Lookup[opcode].AddrMode == Aby)
+            {
+                lo = _bus.CpuRead(addr, true); addr++;
+                hi = _bus.CpuRead(addr, true); addr++;
+                sInst += "$" + Hex((ushort)((hi << 8) | lo), 4) + ", Y {ABY}";
+            }
+            else if (Lookup[opcode].AddrMode == Ind)
+            {
+                lo = _bus.CpuRead(addr, true); addr++;
+                hi = _bus.CpuRead(addr, true); addr++;
+                sInst += "($" + Hex((ushort)((hi << 8) | lo), 4) + ") {IND}";
+            }
+            else if (Lookup[opcode].AddrMode == Rel)
+            {
+                value = _bus.CpuRead(addr, true); addr++;
+                sInst += "$" + Hex(value, 2) + " [$" + Hex((ushort)(addr + (sbyte)value), 4) + "] {REL}";
+            }
+
+            mapLines[lineAddr] = sInst;
+        }
+
+        return mapLines;
     }
 }

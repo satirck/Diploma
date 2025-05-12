@@ -16,12 +16,14 @@ public class Bus: AbstractBus, IBus
     public Bus()
     {
         Array.Fill(_cpuRam, (byte)0x00);
+        Ppu = new Ppu2C02();
     }
 
     public void InsertCartridge(Cartridge.Cartridge cartridge)
     {
         _cart = cartridge;
         Ppu.ConnectCart(cartridge);
+        Cpu.Reset();
     }
 
     public void Reset()

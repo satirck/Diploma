@@ -1,54 +1,9 @@
-using System.Numerics;
-
 namespace Devices.PPU;
-
-using Cartridge;
 
 public partial class Ppu2C02
 {
-    private Cartridge _cart;
-    
-    private Status _status;
-    private Mask _mask;
-    private PpuCtrl _control;
-    private LoopyRegister _vramAddr;
-    private LoopyRegister _tramAddr;
-
-    private byte[][] _tblName = new byte[2][]
-    {
-        new byte[1024],
-        new byte[1024]
-    };
-
-    private byte[] _tblPalette = new byte[32];
-    
-    private byte[][] _tblPattern = new byte[2][]
-    {
-        new byte[4096],
-        new byte[4096]
-    };
-
-    private Vector4[] _palScreen = new Vector4[0x40];
-    private Sprite _sprScreen = new Sprite(256, 240);
-    private Sprite[] _sprNameTable = [new Sprite(256, 240), new Sprite(256, 240)];
-    private Sprite[] _sprPatternTable = [ new Sprite(128, 128), new Sprite(128, 128) ];
-
-    private short _scanline = 0;
-    private short _cycle = 0;
-    
-    private byte _addrLatch = 0x00;
-    private byte _ppuDataBuffer = 0x00;
-    private ushort _ppuAddr = 0x0000;
-    
-    private Random _random = new Random();
-    
-    public bool FrameComplete = false;
-    public bool Nmi = false;
-        
-    public void ConnectCart(Cartridge cartridge)
-    {
-        _cart = cartridge;
-    }
+    //Utils
+    private readonly Random _random = new Random();
 
     public void Clock()
     {
@@ -56,15 +11,20 @@ public partial class Ppu2C02
         {
             _status.VerticalBlank = false;
         }
-        
+
         if (_scanline == 241 && _cycle == 1)
         {
             _status.VerticalBlank = true;
-            if (_control.enableNmi) { Nmi = true; }
+            if (_control.enableNmi)
+            {
+                Nmi = true;
+            }
         }
-        
-        _sprScreen.SetPixel(_cycle - 1, _scanline, _palScreen[_random.Next() % 2 == 0 ? 0x3F : 0x30]);
-        
+
+        // Fake some noise for now
+        _sprScreen.SetPixel(_cycle - 1, _scanline, _palScreen[(_random.Next() % 2 != 0) ? 0x3F : 0x30]);
+
+        // Advance renderer - it never stops, it's relentless
         _cycle++;
         if (_cycle >= 341)
         {
@@ -100,9 +60,9 @@ public partial class Ppu2C02
                 {
                     byte tileLsb = PpuRead((ushort)(i * 0x1000 + nOffset + row + 0));
                     byte tileMsb = PpuRead((ushort)(i * 0x1000 + nOffset + row + 8));
-                    
+
                     for (byte col = 0; col < 8; col++)
-                    {   
+                    {
                         byte pixel = (byte)((tileLsb & 0x01) + (tileMsb & 0x01));
                         tileLsb >>= 1;
                         tileMsb >>= 1;
@@ -110,45 +70,46 @@ public partial class Ppu2C02
                         _sprPatternTable[i].SetPixel(
                             nTileX * 8 + (7 - col),
                             nTileY * 8 + row,
-                            GetColorFromPalette(palette, pixel)
+                            GetColorFromPaletteRam(palette, pixel)
                         );
                     }
                 }
             }
         }
-        
+
         return _sprPatternTable[i];
     }
 
-    public Vector4 GetColorFromPalette(byte palette, byte pixel)
+    private Pixel GetColorFromPaletteRam(byte palette, byte pixel)
     {
-        return _palScreen[PpuRead((ushort)(0x3F00 + (palette << 2) + pixel))];
+        var address = 0x3F00 + (palette << 2) + pixel;
+        return _palScreen[PpuRead((ushort)address)];
     }
 
     public byte CpuRead(ushort addr, bool bReadOnly = false)
     {
         byte data = 0x00;
 
-        switch ((PpuAddrStates)addr)
+        switch (addr)
         {
-            case PpuAddrStates.Control:
+            case 0x0000: // Control
                 break;
-            case PpuAddrStates.Mask:
+            case 0x0001: // Mask
                 break;
-            case PpuAddrStates.Status:
+            case 0x0002: // Status
                 data = (byte)((_status.reg & 0xE0) | (_ppuDataBuffer & 0x1F));
                 _status.VerticalBlank = false;
-                _addrLatch = 0;
+                _addressLatch = 0;
                 break;
-            case PpuAddrStates.OamAddress:
+            case 0x0003: // OAM Address
                 break;
-            case PpuAddrStates.OamData:
+            case 0x0004: // OAM Data
                 break;
-            case PpuAddrStates.Scroll:
+            case 0x0005: // Scroll
                 break;
-            case PpuAddrStates.PpuAddress:
+            case 0x0006: // PPU Address
                 break;
-            case PpuAddrStates.PpuData:
+            case 0x0007: // PPU Data
                 data = _ppuDataBuffer;
                 _ppuDataBuffer = PpuRead(_ppuAddr);
 
@@ -162,35 +123,36 @@ public partial class Ppu2C02
 
     public void CpuWrite(ushort addr, byte data)
     {
-        switch ((PpuAddrStates)addr)
+        switch (addr)
         {
-            case PpuAddrStates.Control:
+            case 0x0000: // Control
                 _control.reg = data;
                 break;
-            case PpuAddrStates.Mask:
+            case 0x0001: // Mask
                 _mask.reg = data;
                 break;
-            case PpuAddrStates.Status:
+            case 0x0002: // Status
                 break;
-            case PpuAddrStates.OamAddress:
+            case 0x0003: // OAM Address
                 break;
-            case PpuAddrStates.OamData:
+            case 0x0004: // OAM Data
                 break;
-            case PpuAddrStates.Scroll:
+            case 0x0005: // Scroll
                 break;
-            case PpuAddrStates.PpuAddress:
-                if (_addrLatch == 0)
+            case 0x0006: // PPU Address
+                if (_addressLatch == 0)
                 {
                     _ppuAddr = (ushort)((_ppuAddr & 0x00FF) | (data << 8));
-                    _addrLatch = 1;
+                    _addressLatch = 1;
                 }
                 else
                 {
                     _ppuAddr = (ushort)((_ppuAddr & 0xFF00) | data);
-                    _addrLatch = 0;
+                    _addressLatch = 0;
                 }
+
                 break;
-            case PpuAddrStates.PpuData:
+            case 0x0007: // PPU Data
                 PpuWrite(_ppuAddr, data);
                 _ppuAddr++;
                 break;
@@ -205,53 +167,51 @@ public partial class Ppu2C02
         if (_cart.PpuRead(addr, ref data))
         {
         }
-        else if (addr is >= 0x0000 and <= 0x1FFF)
+        else if (addr <= 0x1FFF)
         {
-            data = _tblPattern[(ushort)((addr & 0x1000) >> 12)][(ushort)(addr & 0x0FFF)];
-            
+            data = _tblPattern[(addr & 0x1000) >> 12, addr & 0x0FFF];
         }
-        else if (addr is >= 0x2000 and <= 0x3EFF)
+        else if (addr <= 0x3EFF)
         {
-            
-        }    
-        else if (addr is >= 0x3F00 and <= 0x3FFF)
+        }
+        else if (addr <= 0x3FFF)
         {
             addr &= 0x001F;
             if (addr == 0x0010) addr = 0x0000;
             if (addr == 0x0014) addr = 0x0004;
             if (addr == 0x0018) addr = 0x0008;
             if (addr == 0x001C) addr = 0x000C;
-
             data = _tblPalette[addr];
-        }    
-        
+        }
+
         return data;
     }
 
     public void PpuWrite(ushort addr, byte data)
     {
         addr &= 0x3FFF;
-
         if (_cart.PpuWrite(addr, data))
         {
         }
-        else if (addr is >= 0x0000 and <= 0x1FFF)
+        else if (addr <= 0x1FFF)
         {
-            _tblPattern[(ushort)((addr & 0x1000) >> 12)][(ushort)(addr & 0x0FFF)] = data;
+            _tblPattern[(addr & 0x1000) >> 12, addr & 0x0FFF] = data;
         }
-        else if (addr is >= 0x2000 and <= 0x3EFF)
+        else if (addr <= 0x3EFF)
         {
-            
-        }    
-        else if (addr is >= 0x3F00 and <= 0x3FFF)
+        }
+        else if (addr <= 0x3FFF)
         {
             addr &= 0x001F;
             if (addr == 0x0010) addr = 0x0000;
             if (addr == 0x0014) addr = 0x0004;
             if (addr == 0x0018) addr = 0x0008;
             if (addr == 0x001C) addr = 0x000C;
-
             _tblPalette[addr] = data;
-        }    
+        }
+    }
+
+    public void Reset()
+    {
     }
 }
