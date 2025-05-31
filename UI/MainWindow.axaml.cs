@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Text;
 using System.Timers;
 using Avalonia;
@@ -9,6 +8,7 @@ using Avalonia.Input;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Threading;
+using Avalonia.Platform.Storage;
 using Devices.Bus.v1;
 using Devices.Cartridge;
 using Devices.CPU;
@@ -21,42 +21,30 @@ public partial class MainWindow : Window
     private TextBlock _cpuInfoTextBlock;
     private StackPanel _flagsNamesRow;
     private StackPanel _flagsValuesRow;
-    private List<TextBlock> _flagValueBlocks;
+    private List<TextBlock> _flagValueBlocks = new();
 
     private Image _screenImage;
-    private WriteableBitmap _bitmap;
+    private WriteableBitmap? _bitmap;
 
     private Image _patternTable0Image;
     private Image _patternTable1Image;
 
     private Timer _updateTimer;
-    private Bus _nes;
-    private Cartridge _cart;
+    private Bus? _nes;
+    private Cartridge? _cart;
 
-    private string _path = "/home/miki/work/NesRoms/" + "nestest.nes";
-    private bool _isEmuRunning = false;
-
-    private byte _selectedPallet = 0;
-    private Dictionary<ushort, string> _asmMap;
+    private bool _isEmuRunning;
+    private byte _selectedPallet = 1;
+    private Dictionary<ushort, string> _asmMap = new();
 
     public MainWindow()
     {
-        // var logFilePath = "log.txt";
-        // var fileStream = new FileStream(logFilePath, FileMode.Create, FileAccess.Write);
-        // var streamWriter = new StreamWriter(fileStream) { AutoFlush = true };
-        // Console.SetOut(streamWriter);
-
         InitializeComponent();
         DisassemblyTextBlock = this.FindControl<TextBlock>("DisassemblyTextBlock");
         KeyDown += OnKeyDown;
 
         MinWidth = 600;
         MinHeight = 600;
-
-        _nes = new Bus();
-
-        _cart = new Cartridge(_path);
-        _nes.InsertCartridge(_cart);
 
         _screenImage = ScreenImage;
         _cpuInfoTextBlock = CpuInfoTextBlock;
@@ -66,15 +54,14 @@ public partial class MainWindow : Window
         _flagsNamesRow = this.FindControl<StackPanel>("FlagsNamesRow")!;
         _flagsValuesRow = this.FindControl<StackPanel>("FlagsValuesRow")!;
 
-        InitFlagUI();
-        UpdatePatternTable();
+        InitFlagUi();
 
         _updateTimer = new Timer(16);
         _updateTimer.Elapsed += (_, _) => Dispatcher.UIThread.Post(UpdateCpuInfo);
         _updateTimer.Start();
     }
 
-    private void InitFlagUI()
+    private void InitFlagUi()
     {
         var flagNames = new[] { "N", "V", "U", "B", "D", "I", "Z", "C" };
         _flagValueBlocks = new List<TextBlock>();
@@ -85,14 +72,14 @@ public partial class MainWindow : Window
             {
                 Text = name,
                 Margin = new Thickness(4, 0),
-                FontWeight = FontWeight.Bold
+                FontWeight = FontWeight.Bold,
             });
 
             var valBlock = new TextBlock
             {
                 Text = "0",
                 Margin = new Thickness(4, 0),
-                FontWeight = FontWeight.Bold
+                FontWeight = FontWeight.Bold,
             };
 
             _flagValueBlocks.Add(valBlock);
@@ -118,6 +105,8 @@ public partial class MainWindow : Window
 
     private void OnKeyDown(object? sender, KeyEventArgs e)
     {
+        if (_nes == null) return;
+
         if (e.Key == Key.R)
         {
             _nes.Cpu.Reset();
@@ -155,6 +144,7 @@ public partial class MainWindow : Window
 
     private void UpdatePatternTable()
     {
+        if (_nes == null) return;
         RenderPatternTable(_nes.Ppu.GetPatternTable(0, _selectedPallet), _patternTable0Image);
         RenderPatternTable(_nes.Ppu.GetPatternTable(1, _selectedPallet), _patternTable1Image);
     }
@@ -214,7 +204,7 @@ public partial class MainWindow : Window
     {
         var map = new Dictionary<ushort, string>();
         ushort scanStart = (ushort)(pc > 0x20 ? pc - 0x20 : 0x0000);
-        var tempMap = _nes.Cpu.Disassemble(scanStart, (ushort)(pc + 0x20));
+        var tempMap = _nes!.Cpu.Disassemble(scanStart, (ushort)(pc + 0x20));
         var keys = new List<ushort>(tempMap.Keys);
         keys.Sort();
 
@@ -233,6 +223,8 @@ public partial class MainWindow : Window
 
     private void UpdateCpuInfo()
     {
+        if (_nes == null) return;
+
         if (_isEmuRunning)
         {
             do { _nes.Clock(); } while (!_nes.Ppu.FrameComplete);
@@ -257,12 +249,58 @@ public partial class MainWindow : Window
 
         RenderSpriteToImage(_nes.Ppu.GetScreen());
 
-        _asmMap = DisassembleAround(cpu.Pc, 10, 10);
+        _asmMap = DisassembleAround(cpu.Pc, 5, 5);
 
         var disasmSb = new StringBuilder();
         foreach (var line in _asmMap)
             disasmSb.AppendLine(line.Key == cpu.Pc ? $"> {line.Value}" : $"  {line.Value}");
 
         DisassemblyTextBlock.Text = disasmSb.ToString();
+    }
+
+    private async void OnOpenFileClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = "Open NES ROM",
+            AllowMultiple = false,
+            FileTypeFilter = new[] 
+            { 
+                new FilePickerFileType("NES ROMs") 
+                { 
+                    Patterns = new[] { "*.nes" } 
+                } 
+            }
+        });
+
+        if (files.Count > 0 && files[0] is { } file)
+        {
+            var path = file.Path.LocalPath;
+            try
+            {
+                _cart = new Cartridge(path);
+                _nes = new Bus();
+                _nes.InsertCartridge(_cart);
+                _isEmuRunning = false;
+                _nes.Cpu.Reset();
+                UpdatePatternTable();
+            }
+            catch (Exception ex)
+            {
+                var dialog = new Window
+                {
+                    Title = "Error",
+                    Content = new TextBlock
+                    {
+                        Text = $"Failed to load ROM: {ex.Message}",
+                        Margin = new Thickness(20),
+                        TextWrapping = TextWrapping.Wrap
+                    },
+                    SizeToContent = SizeToContent.WidthAndHeight,
+                    WindowStartupLocation = WindowStartupLocation.CenterOwner
+                };
+                await dialog.ShowDialog(this);
+            }
+        }
     }
 }

@@ -149,7 +149,8 @@ public class Mapper001(byte prgBanks, byte chrBanks) : Mapper(prgBanks, chrBanks
             case 1: return OneScreenHi;
             case 2: return Vertical;
             case 3: return Horizontal;
-            default: return Hardware;
+            default: return Horizontal;
+            // default: return Hardware;
         }
     }
 

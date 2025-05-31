@@ -539,8 +539,9 @@ public partial class Cpu6502
 
     public byte Zp0()
     {
-        AddrAbs = (ushort)(Read(Pc) & -0x00FF);
+        AddrAbs = Read(Pc);
         Pc++;
+        AddrAbs &= 0x00FF;
         return 0;
     }
 

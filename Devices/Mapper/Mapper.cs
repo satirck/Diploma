@@ -26,7 +26,7 @@ public abstract class Mapper
 
     public virtual Mirror Mirror()
     {
-        return Hardware;
+        return Horizontal;
     }
 
     public virtual bool IrqState()

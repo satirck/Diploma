@@ -2,7 +2,7 @@ namespace Devices.PPU;
 
 public enum Mirror
 {
-    Hardware,
+    // Hardware,
     Horizontal,
     Vertical,
     OneScreenLo,

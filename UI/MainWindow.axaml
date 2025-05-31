@@ -2,71 +2,78 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="NES Emulator"
         x:Class="UI.MainWindow"
-        MinWidth="600" MinHeight="600">
-    <Grid Name="MainGrid">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="*" />
-        </Grid.RowDefinitions>
-        <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="*" />
-            <ColumnDefinition Width="2" />
-            <ColumnDefinition Width="300" />
-        </Grid.ColumnDefinitions>
+        MinWidth="600" MinHeight="600"
+        FontSize="14"
+        FontFamily="{StaticResource CourierPrime}">
+    <DockPanel>
+        <Menu DockPanel.Dock="Top">
+            <MenuItem Header="File">
+                <MenuItem Header="Open" Click="OnOpenFileClick"/>
+            </MenuItem>
+        </Menu>
+        
+        <Grid Name="MainGrid">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="2" />
+                <ColumnDefinition Width="300" />
+            </Grid.ColumnDefinitions>
 
-        <Grid Grid.Column="0">
-            <Image Name="ScreenImage"
-                   Width="512" Height="480"
-                   HorizontalAlignment="Left"
-                   VerticalAlignment="Top"
-                   Stretch="Fill"/>
-        </Grid>
+            <Grid Grid.Column="0">
+                <Image Name="ScreenImage"
+                       Width="512" Height="480"
+                       HorizontalAlignment="Left"
+                       VerticalAlignment="Top"
+                       Stretch="Fill"/>
+            </Grid>
 
-        <Border Grid.Column="1"
-                Background="Gray"
-                Width="2"
-                VerticalAlignment="Stretch" />
+            <Border Grid.Column="1"
+                    Background="Gray"
+                    Width="2"
+                    VerticalAlignment="Stretch" />
 
-        <ScrollViewer Grid.Column="2"
-                      VerticalScrollBarVisibility="Auto">
-            <StackPanel Margin="10">
-                <TextBlock Name="CpuInfoTextBlock"
-                           FontSize="14"
-                           Text="CPU Info"
-                           TextWrapping="Wrap"
-                           Margin="0,0,0,10"/>
-
-                <!-- Флаги -->
-                <StackPanel Name="FlagsPanel"
-                            Orientation="Vertical"
-                            Margin="0,0,0,10">
-                    <StackPanel Name="FlagsNamesRow"
-                                Orientation="Horizontal"
-                                HorizontalAlignment="Left"/>
-                    <StackPanel Name="FlagsValuesRow"
-                                Orientation="Horizontal"
-                                HorizontalAlignment="Left"/>
-                </StackPanel>
-
-                <StackPanel Orientation="Horizontal"
-                            HorizontalAlignment="Left">
-                    <Image Name="PatternTable0Image"
-                           Width="128" Height="128"
-                           Margin="5"/>
-                    <Image Name="PatternTable1Image"
-                           Width="128" Height="128"
-                           Margin="5"/>
-                </StackPanel>
-                
-                <ScrollViewer Height="380"
-                              VerticalScrollBarVisibility="Auto"
-                              Margin="0,10,0,0">
-                    <TextBlock Name="DisassemblyTextBlock"
-                               FontFamily="Consolas"
-                               FontSize="12"
+            <ScrollViewer Grid.Column="2"
+                          VerticalScrollBarVisibility="Auto">
+                <StackPanel Margin="10">
+                    <TextBlock Name="CpuInfoTextBlock"
+                               Text="CPU Info"
                                TextWrapping="Wrap"
-                               Text=""/>
-                </ScrollViewer>
-            </StackPanel>
-        </ScrollViewer>
-    </Grid>
+                               Margin="0,0,0,10"/>
+
+                    <!-- Флаги -->
+                    <StackPanel Name="FlagsPanel"
+                                Orientation="Vertical"
+                                Margin="0,0,0,10">
+                        <StackPanel Name="FlagsNamesRow"
+                                    Orientation="Horizontal"
+                                    HorizontalAlignment="Left"/>
+                        <StackPanel Name="FlagsValuesRow"
+                                    Orientation="Horizontal"
+                                    HorizontalAlignment="Left"/>
+                    </StackPanel>
+
+                    <StackPanel Orientation="Horizontal"
+                                HorizontalAlignment="Left">
+                        <Image Name="PatternTable0Image"
+                               Width="128" Height="128"
+                               Margin="5"/>
+                        <Image Name="PatternTable1Image"
+                               Width="128" Height="128"
+                               Margin="5"/>
+                    </StackPanel>
+                    
+                    <ScrollViewer Height="380"
+                                  VerticalScrollBarVisibility="Auto"
+                                  Margin="0,10,0,0">
+                        <TextBlock Name="DisassemblyTextBlock"
+                                   TextWrapping="Wrap"
+                                   Text=""/>
+                    </ScrollViewer>
+                </StackPanel>
+            </ScrollViewer>
+        </Grid>
+    </DockPanel>
 </Window>

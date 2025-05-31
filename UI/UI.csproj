@@ -24,4 +24,11 @@
     <ItemGroup>
       <ProjectReference Include="..\Devices\Devices.csproj" />
     </ItemGroup>
+
+    <ItemGroup>
+      <AvaloniaResource Include="Assets\Fonts\VT323-Regular.ttf"/>
+      <AvaloniaResource Include="Assets\Fonts\CourierPrime-Regular.ttf"/>
+      <AvaloniaResource Include="Assets\Fonts\CutiveMono-Regular.ttf"/>
+    </ItemGroup>
+
 </Project>

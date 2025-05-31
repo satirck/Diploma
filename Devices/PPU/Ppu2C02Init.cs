@@ -33,6 +33,16 @@ public partial class Ppu2C02
     private Sprite[] _sprNameTable = [new Sprite(256, 240), new Sprite(256, 240)];
     private Sprite[] _sprPatternTable = [ new Sprite(128, 128), new Sprite(128, 128) ];
 
+    // Background rendering
+    private byte _bgNextTileId = 0x00;
+    private byte _bgNextTileAttrib = 0x00;
+    private byte _bgNextTileLsb = 0x00;
+    private byte _bgNextTileMsb = 0x00;
+    private ushort _bgShifterPatternLo = 0x0000;
+    private ushort _bgShifterPatternHi = 0x0000;
+    private ushort _bgShifterAttribLo = 0x0000;
+    private ushort _bgShifterAttribHi = 0x0000;
+
     public bool FrameComplete = false;
     public bool Nmi = false;
 

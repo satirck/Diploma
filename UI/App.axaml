@@ -4,7 +4,14 @@
              RequestedThemeVariant="Default">
              <!-- "Default" ThemeVariant follows system theme variant. "Dark" or "Light" are other available options. -->
 
+    <Application.Resources>
+        <FontFamily x:Key="CourierPrime">avares://UI/Assets/Fonts/CourierPrime-Regular.ttf#Courier Prime</FontFamily>
+        <FontFamily x:Key="CutiveMono">avares://UI/Assets/Fonts/CutiveMono-Regular.ttf#Cutive Mono</FontFamily>
+        <FontFamily x:Key="VT323">avares://UI/Assets/Fonts/VT323-Regular.ttf#VT323</FontFamily>
+    </Application.Resources>
+
     <Application.Styles>
         <FluentTheme />
+        
     </Application.Styles>
 </Application>

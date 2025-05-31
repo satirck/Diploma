@@ -196,16 +196,6 @@ public class Cartridge
         return info;
     }
 
-    public byte[] GetPatternTable0()
-    {
-        return _vChrMemory.Take(0x1000).ToArray();
-    }
-
-    public byte[] GetPatternTable1()
-    {
-        return _vChrMemory.Skip(0x1000).Take(0x1000).ToArray();
-    }
-
     private struct Header
     {
         [MarshalAs(UnmanagedType.ByValArray, SizeConst = 4)]
