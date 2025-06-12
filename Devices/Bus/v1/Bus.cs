@@ -65,6 +65,10 @@ public class Bus: AbstractBus, IBus
         {
             Ppu.CpuWrite((ushort)(addr & 0x0007), data);
         }
+        else if (addr is >= 0x4016 and <= 0x4017)
+        {
+            _controllerState[addr & 0x0001] = Controller[addr & 0x0001];
+        }
     }
 
     public override byte CpuRead(ushort addr, bool bReadOnly = false)
@@ -82,6 +86,11 @@ public class Bus: AbstractBus, IBus
         else if (addr is >= 0x2000 and <= 0x3FFF)
         {
             data = Ppu.CpuRead((ushort)(addr & 0x0007), bReadOnly);
+        }
+        else if (addr is >= 0x4016 and <= 0x4017)
+        {
+            data = (_controllerState[addr & 0x0001] & 0x80) > 0 ? (byte)1 : (byte)0;
+            _controllerState[addr & 0x0001] <<= 1;
         }
         
         return data;

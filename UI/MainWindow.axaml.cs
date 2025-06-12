@@ -38,11 +38,14 @@ public partial class MainWindow : Window
     private byte _selectedPallet = 0;
     private Dictionary<ushort, string> _asmMap = new();
 
+    private HashSet<Key> _pressedKeys = new();
+
     public MainWindow()
     {
         InitializeComponent();
         DisassemblyTextBlock = this.FindControl<TextBlock>("DisassemblyTextBlock");
         KeyDown += OnKeyDown;
+        KeyUp += OnKeyUp;
 
         MinWidth = 600;
         MinHeight = 600;
@@ -52,8 +55,8 @@ public partial class MainWindow : Window
         _patternTable0Image = PatternTable0Image;
         _patternTable1Image = PatternTable1Image;
         _paletteCanvas = this.FindControl<Canvas>("PaletteCanvas")!;
-        _paletteCanvas.Width = 16 * 8 + 6;  // 16 squares * 8 pixels + 6 pixels for gaps
-        _paletteCanvas.Height = 16 + 2;     // 2 rows * 8 pixels + 2 pixels gap
+        _paletteCanvas.Width = 16 * 8 + 6; // 16 squares * 8 pixels + 6 pixels for gaps
+        _paletteCanvas.Height = 16 + 2; // 2 rows * 8 pixels + 2 pixels gap
 
         _flagsNamesRow = this.FindControl<StackPanel>("FlagsNamesRow")!;
         _flagsValuesRow = this.FindControl<StackPanel>("FlagsValuesRow")!;
@@ -109,12 +112,18 @@ public partial class MainWindow : Window
 
     private void OnKeyDown(object? sender, KeyEventArgs e)
     {
+        _pressedKeys.Add(e.Key);
         if (_nes == null) return;
 
         if (e.Key == Key.R)
         {
             _nes.Cpu.Reset();
             _isEmuRunning = false;
+        }
+
+        if (e.Key == Key.U)
+        {
+            UpdatePatternTable();
         }
 
         if (e.Key == Key.P)
@@ -130,27 +139,48 @@ public partial class MainWindow : Window
             UpdatePatternTable();
         }
 
-        if (_isEmuRunning) return;
 
         if (e.Key == Key.C)
         {
-            do { _nes.Clock(); } while (!_nes.Cpu.Complete());
-            do { _nes.Clock(); } while (_nes.Cpu.Complete());
+            do
+            {
+                _nes.Clock();
+            } while (!_nes.Cpu.Complete());
+
+            do
+            {
+                _nes.Clock();
+            } while (_nes.Cpu.Complete());
         }
 
         if (e.Key == Key.F)
         {
-            do { _nes.Clock(); } while (!_nes.Ppu.FrameComplete);
-            do { _nes.Clock(); } while (!_nes.Cpu.Complete());
+            do
+            {
+                _nes.Clock();
+            } while (!_nes.Ppu.FrameComplete);
+
+            do
+            {
+                _nes.Clock();
+            } while (!_nes.Cpu.Complete());
+
             _nes.Ppu.FrameComplete = false;
         }
+    }
+
+    private void OnKeyUp(object? sender, KeyEventArgs e)
+    {
+        _pressedKeys.Remove(e.Key);
     }
 
     private void UpdatePatternTable()
     {
         if (_nes == null) return;
+
         RenderPatternTable(_nes.Ppu.GetPatternTable(0, _selectedPallet), _patternTable0Image);
         RenderPatternTable(_nes.Ppu.GetPatternTable(1, _selectedPallet), _patternTable1Image);
+
         UpdatePaletteDisplay();
     }
 
@@ -298,13 +328,39 @@ public partial class MainWindow : Window
         return map;
     }
 
+    private byte PollController()
+    {
+        byte state = 0;
+        bool ctrl = _pressedKeys.Contains(Key.LeftCtrl) || _pressedKeys.Contains(Key.RightCtrl);
+
+        if (_pressedKeys.Contains(Key.X)) state |= 0x80;     // A
+        if (_pressedKeys.Contains(Key.Z)) state |= 0x40;     // B
+        if (_pressedKeys.Contains(Key.A)) state |= 0x20;     // Select
+        if (_pressedKeys.Contains(Key.S)) state |= 0x10;     // Start
+
+        // Теперь вместо стрелок используем Numpad: 8 (Up), 2 (Down), 4 (Left), 6 (Right)
+        if (_pressedKeys.Contains(Key.NumPad8)) state |= 0x08; // Up
+        if (_pressedKeys.Contains(Key.NumPad2)) state |= 0x04; // Down
+        if (_pressedKeys.Contains(Key.NumPad4)) state |= 0x02; // Left
+        if (_pressedKeys.Contains(Key.NumPad6)) state |= 0x01; // Right
+
+        _pressedKeys.Clear(); // очищаем после чтения
+        return state;
+    }
+
     private void UpdateCpuInfo()
     {
         if (_nes == null) return;
 
+        _nes.Controller[0] = PollController();
+
         if (_isEmuRunning)
         {
-            do { _nes.Clock(); } while (!_nes.Ppu.FrameComplete);
+            do
+            {
+                _nes.Clock();
+            } while (!_nes.Ppu.FrameComplete);
+
             _nes.Ppu.FrameComplete = false;
         }
 
@@ -341,12 +397,12 @@ public partial class MainWindow : Window
         {
             Title = "Open NES ROM",
             AllowMultiple = false,
-            FileTypeFilter = new[] 
-            { 
-                new FilePickerFileType("NES ROMs") 
-                { 
-                    Patterns = new[] { "*.nes" } 
-                } 
+            FileTypeFilter = new[]
+            {
+                new FilePickerFileType("NES ROMs")
+                {
+                    Patterns = new[] { "*.nes" }
+                }
             }
         });
 
