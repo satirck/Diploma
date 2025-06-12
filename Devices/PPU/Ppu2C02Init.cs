@@ -15,6 +15,9 @@ public partial class Ppu2C02
     
     private LoopyRegister _vramAddr;
     private LoopyRegister _tramAddr;
+    
+    private ObjectAttributeEntry[] OAM = new ObjectAttributeEntry[64];
+    public ref ObjectAttributeEntry  pOAM => ref OAM[0];    
 
     private byte _fineX = 0x00;
     private byte _addressLatch = 0x00;
