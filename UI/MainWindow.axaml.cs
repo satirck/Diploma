@@ -28,13 +28,14 @@ public partial class MainWindow : Window
 
     private Image _patternTable0Image;
     private Image _patternTable1Image;
+    private Canvas _paletteCanvas;
 
     private Timer _updateTimer;
     private Bus? _nes;
     private Cartridge? _cart;
 
     private bool _isEmuRunning;
-    private byte _selectedPallet = 1;
+    private byte _selectedPallet = 0;
     private Dictionary<ushort, string> _asmMap = new();
 
     public MainWindow()
@@ -50,6 +51,9 @@ public partial class MainWindow : Window
         _cpuInfoTextBlock = CpuInfoTextBlock;
         _patternTable0Image = PatternTable0Image;
         _patternTable1Image = PatternTable1Image;
+        _paletteCanvas = this.FindControl<Canvas>("PaletteCanvas")!;
+        _paletteCanvas.Width = 16 * 8 + 6;  // 16 squares * 8 pixels + 6 pixels for gaps
+        _paletteCanvas.Height = 16 + 2;     // 2 rows * 8 pixels + 2 pixels gap
 
         _flagsNamesRow = this.FindControl<StackPanel>("FlagsNamesRow")!;
         _flagsValuesRow = this.FindControl<StackPanel>("FlagsValuesRow")!;
@@ -99,7 +103,7 @@ public partial class MainWindow : Window
         {
             bool isSet = (status & (byte)flagValues[i]) != 0;
             _flagValueBlocks[i].Text = isSet ? "1" : "0";
-            _flagValueBlocks[i].Foreground = isSet ? Brushes.Green : Brushes.Red;
+            _flagValueBlocks[i].Foreground = isSet ? Brushes.DarkGreen : Brushes.DarkRed;
         }
     }
 
@@ -147,6 +151,79 @@ public partial class MainWindow : Window
         if (_nes == null) return;
         RenderPatternTable(_nes.Ppu.GetPatternTable(0, _selectedPallet), _patternTable0Image);
         RenderPatternTable(_nes.Ppu.GetPatternTable(1, _selectedPallet), _patternTable1Image);
+        UpdatePaletteDisplay();
+    }
+
+    private void UpdatePaletteDisplay()
+    {
+        if (_nes == null) return;
+
+        _paletteCanvas.Children.Clear();
+        const int squareSize = 8;
+        const int squaresPerRow = 16;
+        const int totalSquares = 32;
+        const int gapSize = 2;
+
+        // Сначала рисуем фоновые прямоугольники для групп (без выделения)
+        for (int group = 0; group < 8; group++)
+        {
+            int row = group / 4;
+            int col = group % 4;
+            var groupRect = new Border
+            {
+                Width = squareSize * 4 + gapSize * 3,
+                Height = squareSize + gapSize,
+                BorderBrush = Brushes.DarkGray,
+                BorderThickness = new Thickness(0.5)
+            };
+            int xOffset = col * (squareSize * 4 + gapSize * 3);
+            int yOffset = row * (squareSize + gapSize);
+            Canvas.SetLeft(groupRect, xOffset);
+            Canvas.SetTop(groupRect, yOffset);
+            _paletteCanvas.Children.Add(groupRect);
+        }
+
+        // Затем рисуем цветные квадратики
+        for (int i = 0; i < totalSquares; i++)
+        {
+            int row = i / squaresPerRow;
+            int col = i % squaresPerRow;
+            byte palette = (byte)(i / 4);
+            byte pixel = (byte)(i % 4);
+            var color = _nes.Ppu.GetColorFromPaletteRam(palette, pixel);
+            int groupCol = col % 4;
+            int groupRow = col / 4;
+            int xOffset = groupRow * (squareSize * 4 + gapSize * 3) + groupCol * squareSize;
+            int yOffset = row * (squareSize + gapSize);
+            var square = new Border
+            {
+                Width = squareSize,
+                Height = squareSize,
+                Background = new SolidColorBrush(Color.FromUInt32(color.ToBgra8888())),
+                BorderBrush = Brushes.Black,
+                BorderThickness = new Thickness(0.5)
+            };
+            Canvas.SetLeft(square, xOffset);
+            Canvas.SetTop(square, yOffset);
+            _paletteCanvas.Children.Add(square);
+        }
+
+        // В конце рисуем жёлтую рамку поверх выбранной группы
+        int selRow = _selectedPallet / 4;
+        int selCol = _selectedPallet % 4;
+        int selX = selCol * (squareSize * 4 + gapSize * 3);
+        int selY = selRow * (squareSize + gapSize);
+        var highlight = new Border
+        {
+            Width = squareSize * 4,
+            Height = squareSize + gapSize,
+            BorderBrush = Brushes.Yellow,
+            BorderThickness = new Thickness(2),
+            Background = null
+        };
+        Canvas.SetLeft(highlight, selX);
+        Canvas.SetTop(highlight, selY);
+        _paletteCanvas.Children.Add(highlight);
     }
 
     private void RenderSpriteToImage(Sprite sprite)
@@ -302,5 +379,52 @@ public partial class MainWindow : Window
                 await dialog.ShowDialog(this);
             }
         }
+    }
+
+    private async void OnCartridgeInfoClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (_cart == null)
+        {
+            var dialog = new Window
+            {
+                Title = "Cartridge Info",
+                Content = new TextBlock
+                {
+                    Text = "No cartridge loaded.",
+                    Margin = new Thickness(20),
+                    TextWrapping = TextWrapping.Wrap
+                },
+                SizeToContent = SizeToContent.WidthAndHeight,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner
+            };
+            await dialog.ShowDialog(this);
+            return;
+        }
+
+        var info = _cart.GetInfo();
+        var sb = new StringBuilder();
+        sb.AppendLine($"Mapper: {info.MapperName} (ID: {info.MapperId})");
+        sb.AppendLine($"PRG Banks: {info.PrgBanks}");
+        sb.AppendLine($"CHR Banks: {info.ChrBanks}");
+        sb.AppendLine($"Mirror Mode: {info.MirrorMode}");
+        sb.AppendLine($"Has Trainer: {info.HasTrainer}");
+        sb.AppendLine($"Valid: {info.IsValid}");
+        sb.AppendLine($"TV System: {info.TvSystem}");
+        sb.AppendLine($"File Format: {info.FileFormat}");
+
+        var infoDialog = new Window
+        {
+            Title = "Cartridge Info",
+            Content = new TextBlock
+            {
+                Text = sb.ToString(),
+                Margin = new Thickness(20),
+                TextWrapping = TextWrapping.Wrap,
+                FontFamily = new FontFamily("Consolas, Courier New, monospace")
+            },
+            SizeToContent = SizeToContent.WidthAndHeight,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner
+        };
+        await infoDialog.ShowDialog(this);
     }
 }

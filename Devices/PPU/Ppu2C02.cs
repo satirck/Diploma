@@ -2,125 +2,6 @@ namespace Devices.PPU;
 
 public partial class Ppu2C02
 {
-    //Utils
-    private readonly Random _random = new Random();
-
-    public void Clock()
-    {
-        if (_scanline == -1 && _cycle == -1)
-        {
-            _status.VerticalBlank = false;
-        }
-
-        if (_scanline == 241 && _cycle == 1)
-        {
-            _status.VerticalBlank = true;
-            if (_control.enableNmi)
-            {
-                Console.WriteLine("PPU: Triggering NMI");
-                Nmi = true;
-            }
-        }
-
-        if (_scanline >= 0 && _scanline < 240 && _cycle >= 1 && _cycle <= 256)
-        {
-            byte bgPixel = 0x00;
-            byte bgPalette = 0x00;
-
-            if (_mask.renderBackground)
-            {
-                ushort bitMux = (ushort)(0x8000 >> _fineX);
-                byte p0Pixel = (byte)((_bgShifterPatternLo & bitMux) > 0 ? 1 : 0);
-                byte p1Pixel = (byte)((_bgShifterPatternHi & bitMux) > 0 ? 1 : 0);
-                bgPixel = (byte)((p1Pixel << 1) | p0Pixel);
-
-                byte bgPal0 = (byte)((_bgShifterAttribLo & bitMux) > 0 ? 1 : 0);
-                byte bgPal1 = (byte)((_bgShifterAttribHi & bitMux) > 0 ? 1 : 0);
-                bgPalette = (byte)((bgPal1 << 1) | bgPal0);
-            }
-
-            _sprScreen.SetPixel(_cycle - 1, _scanline, GetColorFromPaletteRam(bgPalette, bgPixel));
-        }
-
-        if (_scanline >= -1 && _scanline < 240)
-        {
-            if (_scanline == 0 && _cycle == 0)
-            {
-                _cycle = 1;
-            }
-
-            if (_scanline == -1 && _cycle == 1)
-            {
-                _status.VerticalBlank = false;
-            }
-
-            if ((_cycle >= 2 && _cycle < 258) || (_cycle >= 321 && _cycle < 338))
-            {
-                switch ((_cycle - 1) & 0x07)
-                {
-                    case 0:
-                        LoadBackgroundShifters();
-                        _bgNextTileId = PpuRead((ushort)(0x2000 | (_vramAddr.reg & 0x0FFF)));
-                        break;
-                    case 2:
-                        _bgNextTileAttrib = PpuRead((ushort)(0x23C0 | _vramAddr.GetNametableYShift() | _vramAddr.GetNametableXShift() | ((_vramAddr.coarseY >> 2) << 3) | (_vramAddr.coarseX >> 2)));
-                        if ((_vramAddr.coarseY & 0x02) != 0) _bgNextTileAttrib >>= 4;
-                        if ((_vramAddr.coarseX & 0x02) != 0) _bgNextTileAttrib >>= 2;
-                        _bgNextTileAttrib &= 0x03;
-                        break;
-                    case 4:
-                        _bgNextTileLsb = PpuRead((ushort)(((_control.patternBackground ? 1 : 0) << 12) + ((ushort)_bgNextTileId << 4) + (_vramAddr.fineY) + 0));
-                        break;
-                    case 6:
-                        _bgNextTileMsb = PpuRead((ushort)((_control.patternBackground ? 1 : 0) + ((ushort)_bgNextTileId << 4) + (_vramAddr.fineY) + 8));
-                        break;
-                    case 7:
-                        IncrementScrollX();
-                        break;
-                }
-            }
-
-            if (_cycle == 256)
-            {
-                IncrementScrollY();
-            }
-
-            if (_cycle == 257)
-            {
-                LoadBackgroundShifters();
-                TransferAddressX();
-            }
-
-            if (_scanline == -1 && _cycle >= 280 && _cycle < 305)
-            {
-                TransferAddressY();
-            }
-        }
-
-        // Advance renderer - it never stops, it's relentless
-        _cycle++;
-        if (_cycle >= 341)
-        {
-            _cycle = 0;
-            _scanline++;
-            if (_scanline >= 261)
-            {
-                _scanline = -1;
-                FrameComplete = true;
-                }
-        }
-    }
-
-    public Sprite GetScreen()
-    {
-        return _sprScreen;
-    }
-
-    public Sprite GetNameTable(int i)
-    {
-        return _sprNameTable[i];
-    }
-
     public Sprite GetPatternTable(byte i, byte palette)
     {
         for (byte nTileY = 0; nTileY < 16; nTileY++)
@@ -153,7 +34,7 @@ public partial class Ppu2C02
         return _sprPatternTable[i];
     }
 
-    private Pixel GetColorFromPaletteRam(byte palette, byte pixel)
+    public Pixel GetColorFromPaletteRam(byte palette, byte pixel)
     {
         var address = 0x3F00 + (palette << 2) + pixel;
         byte palIndex = PpuRead((ushort)address);
@@ -171,7 +52,7 @@ public partial class Ppu2C02
             case 0x0001: // Mask
                 break;
             case 0x0002: // Status
-                data = (byte)((_status.reg & 0xE0) | (_ppuDataBuffer & 0x1F));
+                data = (byte)((_status.Reg & 0xE0) | (_ppuDataBuffer & 0x1F));
                 _status.VerticalBlank = false;
                 _addressLatch = 0;
                 break;
@@ -200,10 +81,10 @@ public partial class Ppu2C02
         switch (addr)
         {
             case 0x0000: // Control
-                _control.reg = data;
+                _control.Reg = data;
                 break;
             case 0x0001: // Mask
-                _mask.reg = data;
+                _mask.Reg = data;
                 break;
             case 0x0002: // Status
                 break;
@@ -224,6 +105,7 @@ public partial class Ppu2C02
                     _ppuAddr = (ushort)((_ppuAddr & 0xFF00) | data);
                     _addressLatch = 0;
                 }
+
                 break;
             case 0x0007: // PPU Data
                 PpuWrite(_ppuAddr, data);
@@ -240,46 +122,32 @@ public partial class Ppu2C02
         if (_cart.PpuRead(addr, ref data))
         {
         }
+        // Pattern Memory Request
         else if (addr <= 0x1FFF)
         {
-            data = _tblPattern[(addr & 0x1000) >> 12, addr & 0x0FFF];
+            data = _tblPattern[(ushort)((addr & 0x1000) >> 12), addr & 0x0FFF];
         }
-        else if (addr <= 0x3EFF)
+        // Name Table Memory
+        else if (addr is >= 0x2000 and <= 0x3EFF)
         {
-            addr &= 0x0FFF;
-
             if (_cart.GetMirror() == Mirror.Vertical)
             {
-                // Vertical
-                if (addr >= 0x0000 && addr <= 0x03FF)
-                    data = _tblName[0][addr & 0x03FF];
-                if (addr >= 0x0400 && addr <= 0x07FF)
-                    data = _tblName[1][addr & 0x03FF];
-                if (addr >= 0x0800 && addr <= 0x0BFF)
-                    data = _tblName[0][addr & 0x03FF];
-                if (addr >= 0x0C00 && addr <= 0x0FFF)
-                    data = _tblName[1][addr & 0x03FF];
+                
             }
             else if (_cart.GetMirror() == Mirror.Horizontal)
             {
-                // Horizontal
-                if (addr >= 0x0000 && addr <= 0x03FF)
-                    data = _tblName[0][addr & 0x03FF];
-                if (addr >= 0x0400 && addr <= 0x07FF)
-                    data = _tblName[0][addr & 0x03FF];
-                if (addr >= 0x0800 && addr <= 0x0BFF)
-                    data = _tblName[1][addr & 0x03FF];
-                if (addr >= 0x0C00 && addr <= 0x0FFF)
-                    data = _tblName[1][addr & 0x03FF];
             }
         }
-        else if (addr <= 0x3FFF)
+        // Pallet Memory
+        else if (addr is >= 0x3F00 and <= 0x3FFF)
         {
             addr &= 0x001F;
+
             if (addr == 0x0010) addr = 0x0000;
             if (addr == 0x0014) addr = 0x0004;
             if (addr == 0x0018) addr = 0x0008;
             if (addr == 0x001C) addr = 0x000C;
+
             data = _tblPalette[addr];
         }
 
@@ -289,143 +157,57 @@ public partial class Ppu2C02
     public void PpuWrite(ushort addr, byte data)
     {
         addr &= 0x3FFF;
+
         if (_cart.PpuWrite(addr, data))
         {
         }
+        // Pattern Memory Request
         else if (addr <= 0x1FFF)
         {
-            _tblPattern[(addr & 0x1000) >> 12, addr & 0x0FFF] = data;
+            _tblPattern[(ushort)((addr & 0x1000) >> 12), addr & 0x0FFF] = data;
         }
-        else if (addr <= 0x3EFF)
+        // Name Table Memory
+        else if (addr is >= 0x2000 and <= 0x3EFF)
         {
-            addr &= 0x0FFF;
-            
-            if (_cart.GetMirror() == Mirror.Vertical)
-            {
-                // Vertical
-                if (addr >= 0x0000 && addr <= 0x03FF)
-                    _tblName[0][addr & 0x03FF] = data;
-                if (addr >= 0x0400 && addr <= 0x07FF)
-                    _tblName[1][addr & 0x03FF] = data;
-                if (addr >= 0x0800 && addr <= 0x0BFF)
-                    _tblName[0][addr & 0x03FF] = data;
-                if (addr >= 0x0C00 && addr <= 0x0FFF)
-                    _tblName[1][addr & 0x03FF] = data;
-            }
-            else if (_cart.GetMirror() == Mirror.Horizontal)
-            {
-                // Horizontal
-                if (addr >= 0x0000 && addr <= 0x03FF)
-                    _tblName[0][addr & 0x03FF] = data;
-                if (addr >= 0x0400 && addr <= 0x07FF)
-                    _tblName[0][addr & 0x03FF] = data;
-                if (addr >= 0x0800 && addr <= 0x0BFF)
-                    _tblName[1][addr & 0x03FF] = data;
-                if (addr >= 0x0C00 && addr <= 0x0FFF)
-                    _tblName[1][addr & 0x03FF] = data;
-            }
         }
-        else if (addr <= 0x3FFF)
+        // Pallet Memory
+        else if (addr is >= 0x3F00 and <= 0x3FFF)
         {
             addr &= 0x001F;
+
             if (addr == 0x0010) addr = 0x0000;
             if (addr == 0x0014) addr = 0x0004;
             if (addr == 0x0018) addr = 0x0008;
             if (addr == 0x001C) addr = 0x000C;
+
             _tblPalette[addr] = data;
         }
     }
 
-    public void Reset()
+    public void Clock()
     {
-        _fineX = 0x00;
-        _addressLatch = 0x00;
-        _ppuDataBuffer = 0x00;
-        _scanline = 0;
-        _cycle = 0;
-        _bgNextTileId = 0x00;
-        _bgNextTileAttrib = 0x00;
-        _bgNextTileLsb = 0x00;
-        _bgNextTileMsb = 0x00;
-        _bgShifterPatternLo = 0x0000;
-        _bgShifterPatternHi = 0x0000;
-        _bgShifterAttribLo = 0x0000;
-        _bgShifterAttribHi = 0x0000;
-        _status.reg = 0x00;
-        _mask.reg = 0x00;
-        _control.reg = 0x00;
-        _vramAddr.reg = 0x0000;
-        _tramAddr.reg = 0x0000;
-    }
-
-    private void LoadBackgroundShifters()
-    {
-        _bgShifterPatternLo = (ushort)((_bgShifterPatternLo & 0xFF00) | _bgNextTileLsb);
-        _bgShifterPatternHi = (ushort)((_bgShifterPatternHi & 0xFF00) | _bgNextTileMsb);
-        _bgShifterAttribLo = (ushort)((_bgShifterAttribLo & 0xFF00) | ((_bgNextTileAttrib & 0b01) != 0 ? 0xFF : 0x00));
-        _bgShifterAttribHi = (ushort)((_bgShifterAttribHi & 0xFF00) | ((_bgNextTileAttrib & 0b10) != 0 ? 0xFF : 0x00));
-    }
-
-    private void IncrementScrollX()
-    {
-        if (_mask.renderBackground || _mask.renderSprites)
+        if (-1 == _scanline && 1 == _cycle)
         {
-            if (_vramAddr.coarseX == 31)
-            {
-                _vramAddr.coarseX = 0;
-                _vramAddr.SetNametableX(!_vramAddr.GetNametableX());
-            }
-            else
-            {
-                _vramAddr.coarseX++;
-            }
+            _status.VerticalBlank = false;
         }
-    }
 
-    private void IncrementScrollY()
-    {
-        if (_mask.renderBackground || _mask.renderSprites)
+        if (241 == _scanline && 1 == _cycle)
         {
-            if (_vramAddr.fineY < 7)
-            {
-                _vramAddr.fineY++;
-            }
-            else
-            {
-                _vramAddr.fineY = 0;
-                if (_vramAddr.coarseY == 29)
-                {
-                    _vramAddr.coarseY = 0;
-                    _vramAddr.SetNametableY(!_vramAddr.GetNametableY());
-                }
-                else if (_vramAddr.coarseY == 31)
-                {
-                    _vramAddr.coarseY = 0;
-                }
-                else
-                {
-                    _vramAddr.coarseY++;
-                }
-            }
+            _status.VerticalBlank = true;
+            if (_control.EnableNmi) Nmi = true;
         }
-    }
 
-    private void TransferAddressX()
-    {
-        if (_mask.renderBackground || _mask.renderSprites)
+        // Advance renderer - it never stops, it's relentless
+        _cycle++;
+        if (_cycle >= 341)
         {
-            _vramAddr.SetNametableX(_tramAddr.GetNametableX());
-            _vramAddr.coarseX = _tramAddr.coarseX;
-        }
-    }
-
-    private void TransferAddressY()
-    {
-        if (_mask.renderBackground || _mask.renderSprites)
-        {
-            _vramAddr.fineY = _tramAddr.fineY;
-            _vramAddr.SetNametableY(_tramAddr.GetNametableY());
-            _vramAddr.coarseY = _tramAddr.coarseY;
+            _cycle = 0;
+            _scanline++;
+            if (_scanline >= 261)
+            {
+                _scanline = -1;
+                FrameComplete = true;
+            }
         }
     }
 }

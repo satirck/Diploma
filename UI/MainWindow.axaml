@@ -4,11 +4,13 @@
         x:Class="UI.MainWindow"
         MinWidth="600" MinHeight="600"
         FontSize="14"
-        FontFamily="{StaticResource CourierPrime}">
+        FontFamily="{StaticResource CourierPrime}"
+        Background="DimGray">
     <DockPanel>
         <Menu DockPanel.Dock="Top">
             <MenuItem Header="File">
                 <MenuItem Header="Open" Click="OnOpenFileClick"/>
+                <MenuItem Header="Cartridge Info..." Name="CartridgeInfoMenuItem" Click="OnCartridgeInfoClick"/>
             </MenuItem>
         </Menu>
         
@@ -64,6 +66,8 @@
                                Width="128" Height="128"
                                Margin="5"/>
                     </StackPanel>
+                    
+                    <Canvas Name="PaletteCanvas" Width="80" Height="10"/>
                     
                     <ScrollViewer Height="380"
                                   VerticalScrollBarVisibility="Auto"

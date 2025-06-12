@@ -1,4 +1,4 @@
-using Devices.PPU.PpuRegisters;
+using Devices.PPU.Registers;
 
 namespace Devices.PPU;
 
@@ -8,12 +8,13 @@ public partial class Ppu2C02
     
     private short _scanline;
     private short _cycle;
-
+    //
     private Status _status;
     private Mask _mask;
-    private PpuCtrl _control;
-    private LoopyRegister _vramAddr;
-    private LoopyRegister _tramAddr;
+    private Control _control;
+    
+    // private LoopyRegister _vramAddr;
+    // private LoopyRegister _tramAddr;
 
     private byte _fineX = 0x00;
     private byte _addressLatch = 0x00;
@@ -120,5 +121,37 @@ public partial class Ppu2C02
     public void ConnectCart(Cartridge.Cartridge cartridge)
     {
         _cart = cartridge;
+    }
+    
+    public void Reset()
+    {
+        _fineX = 0x00;
+        _addressLatch = 0x00;
+        _ppuDataBuffer = 0x00;
+        _scanline = 0;
+        _cycle = 0;
+        _bgNextTileId = 0x00;
+        _bgNextTileAttrib = 0x00;
+        _bgNextTileLsb = 0x00;
+        _bgNextTileMsb = 0x00;
+        _bgShifterPatternLo = 0x0000;
+        _bgShifterPatternHi = 0x0000;
+        _bgShifterAttribLo = 0x0000;
+        _bgShifterAttribHi = 0x0000;
+        _status.Reg = 0x00;
+        _mask.Reg = 0x00;
+        _control.Reg = 0x00;
+        // _vramAddr.reg = 0x0000;
+        // _tramAddr.reg = 0x0000;
+    }
+    
+    public Sprite GetScreen()
+    {
+        return _sprScreen;
+    }
+
+    public Sprite GetNameTable(int i)
+    {
+        return _sprNameTable[i];
     }
 }
