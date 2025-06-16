@@ -29,6 +29,7 @@
                        Width="512" Height="480"
                        HorizontalAlignment="Left"
                        VerticalAlignment="Top"
+                       RenderOptions.BitmapInterpolationMode="None"
                        Stretch="Fill"/>
             </Grid>
 

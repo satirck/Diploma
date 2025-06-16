@@ -37,7 +37,7 @@ public partial class MainWindow : Window
     private bool _isEmuRunning;
     private byte _selectedPallet = 0;
     private Dictionary<ushort, string> _asmMap = new();
-    private bool _cpuAsm = false; // Флаг для переключения между CPU и OAM отображением
+    private bool _cpuAsm = true; // Флаг для переключения между CPU и OAM отображением
 
     private HashSet<Key> _pressedKeys = new();
 
@@ -348,11 +348,6 @@ public partial class MainWindow : Window
         if (_pressedKeys.Contains(Key.NumPad2)) state |= 0x04; // Down
         if (_pressedKeys.Contains(Key.NumPad4)) state |= 0x02; // Left
         if (_pressedKeys.Contains(Key.NumPad6)) state |= 0x01; // Right
-
-        // if (_pressedKeys.Contains(Key.Up)) state |= 0x08; // Up
-        // if (_pressedKeys.Contains(Key.Down)) state |= 0x04; // Down
-        // if (_pressedKeys.Contains(Key.Left)) state |= 0x02; // Left
-        // if (_pressedKeys.Contains(Key.Right)) state |= 0x01; // Right
         
         return state;
     }
@@ -390,6 +385,7 @@ public partial class MainWindow : Window
         UpdateFlagUi(cpu.Status);
 
         RenderSpriteToImage(_nes.Ppu.GetScreen());
+        UpdatePatternTable();
 
         if (_cpuAsm)
         {
@@ -435,7 +431,7 @@ public partial class MainWindow : Window
                 _cart = new Cartridge(path);
                 _nes = new Bus();
                 _nes.InsertCartridge(_cart);
-                _isEmuRunning = false;
+                _isEmuRunning = true;
                 _nes.Cpu.Reset();
                 UpdatePatternTable();
             }
