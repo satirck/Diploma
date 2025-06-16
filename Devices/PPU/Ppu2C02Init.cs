@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using Devices.PPU.Registers;
 
 namespace Devices.PPU;
@@ -17,7 +18,18 @@ public partial class Ppu2C02
     private LoopyRegister _tramAddr;
     
     private ObjectAttributeEntry[] OAM = new ObjectAttributeEntry[64];
-    public ref ObjectAttributeEntry  pOAM => ref OAM[0];    
+    public Span<byte> OAMAsBytes => MemoryMarshal.AsBytes<ObjectAttributeEntry>(OAM.AsSpan());
+    public byte OamAddr = 0x00;
+    
+    private ObjectAttributeEntry[] _spriteScanline = new ObjectAttributeEntry[8];
+    private byte _spriteCount = 0;
+    
+    private byte[] _spriteShifterPatternLo = new byte[8];
+    private byte[] _spriteShifterPatternHi = new byte[8];
+
+    // Sprite Zero Collision Flags
+    private bool _bSpriteZeroHitPossible = false;
+    private bool _bSpriteZeroBeingRendered = false;
 
     private byte _fineX = 0x00;
     private byte _addressLatch = 0x00;
@@ -303,5 +315,21 @@ public partial class Ppu2C02
             _bgShifterAttribLo <<= 1;
             _bgShifterAttribHi <<= 1;
         }
+        
+        if (_mask.RenderSprites && _cycle >= 1 && _cycle < 258)
+        {
+            for (int i = 0; i < _spriteCount; i++)
+			{
+                if (_spriteScanline[i].X > 0)
+                {
+                    _spriteScanline[i].X--;
+				}
+				else
+				{
+                    _spriteShifterPatternLo[i] <<= 1;
+                    _spriteShifterPatternHi[i] <<= 1;
+				}
+			}
+		}
     }
 }

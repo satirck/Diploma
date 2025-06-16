@@ -1,3 +1,6 @@
+using System.Runtime.InteropServices;
+using Devices.PPU.Registers;
+
 namespace Devices.PPU;
 
 public partial class Ppu2C02
@@ -17,7 +20,7 @@ public partial class Ppu2C02
 
                     for (byte col = 0; col < 8; col++)
                     {
-                        byte pixel = (byte)((tileLsb & 0x01) + (tileMsb & 0x01));
+                        byte pixel = (byte)(((tileLsb & 0x01) << 1) | (tileMsb & 0x01));
                         tileLsb >>= 1;
                         tileMsb >>= 1;
 
@@ -59,6 +62,7 @@ public partial class Ppu2C02
             case 0x0003: // OAM Address
                 break;
             case 0x0004: // OAM Data
+                data = OAMAsBytes[OamAddr];
                 break;
             case 0x0005: // Scroll
                 break;
@@ -91,8 +95,10 @@ public partial class Ppu2C02
             case 0x0002: // Status
                 break;
             case 0x0003: // OAM Address
+                OamAddr = data;
                 break;
             case 0x0004: // OAM Data
+                OAMAsBytes[OamAddr] = data;
                 break;
             case 0x0005: // Scroll
                 if (_addressLatch == 0)
@@ -250,12 +256,20 @@ public partial class Ppu2C02
             if (-1 == _scanline && 1 == _cycle)
             {
                 _status.VerticalBlank = false;
+                _status.SpriteOverflow = false;
+                _status.SpriteZeroHit = false;
+
+                for (int i = 0; i < 8; i++)
+                {
+                    _spriteShifterPatternLo[i] = 0;
+                    _spriteShifterPatternHi[i] = 0;
+                }
             }
 
             if ((_cycle >= 2 && _cycle < 258) || (_cycle >= 321 && _cycle < 338))
             {
                 UpdateShifters();
-                
+
                 switch ((_cycle - 1) % 8)
                 {
                     case 0:
@@ -311,6 +325,126 @@ public partial class Ppu2C02
             {
                 TransferAddressY();
             }
+
+            if (_cycle == 338 || _cycle == 340)
+            {
+                _bgNextTileId = PpuRead((ushort)(0x2000 | (_vramAddr.Reg & 0x0FFF)));
+            }
+
+            //FOREGROUND RENDERING
+            if (_cycle == 257 && _scanline >= 0)
+            {
+                Span<byte> bytes = MemoryMarshal.AsBytes<ObjectAttributeEntry>(_spriteScanline.AsSpan());
+                bytes.Fill(0xFF);
+
+                _spriteCount = 0;
+
+                byte nOAMEntry = 0;
+                _bSpriteZeroHitPossible = false;
+                while (nOAMEntry < 64 && _spriteCount < 9)
+                {
+                    short diff = (short)((short)_scanline - (short)OAM[nOAMEntry].Y);
+
+                    if (diff >= 0 && diff < (_control.SpriteSize ? 16 : 8))
+                    {
+                        if (_spriteCount < 8)
+                        {
+                            // Is this sprite sprite zero?
+                            if (nOAMEntry == 0)
+                            {
+                                // It is, so its possible it may trigger a 
+                                // sprite zero hit when drawn
+                                _bSpriteZeroHitPossible = true;
+                            }
+
+                            _spriteScanline[_spriteCount] = OAM[nOAMEntry];
+                            _spriteCount++;
+                        }
+                    }
+
+                    nOAMEntry++;
+                }
+
+                _status.SpriteOverflow = (_spriteCount > 8);
+            }
+
+            if (_cycle == 340)
+            {
+                for (byte i = 0; i < _spriteCount; i++)
+                {
+                    byte sprite_pattern_bits_lo, sprite_pattern_bits_hi;
+                    ushort sprite_pattern_addr_lo, sprite_pattern_addr_hi;
+
+                    if (!_control.SpriteSize)
+                    {
+                        if ((_spriteScanline[i].Attribute & 0x80) == 0)
+                        {
+                            sprite_pattern_addr_lo = (ushort)(
+                                (_control.PatternSprite ? 1 : 0) << 12
+                                | (_spriteScanline[i].ID << 4)
+                                | (_scanline - _spriteScanline[i].Y));
+                        }
+                        else
+                        {
+                            sprite_pattern_addr_lo = (ushort)(
+                                (_control.PatternSprite ? 1 : 0) << 12
+                                | (_spriteScanline[i].ID << 4)
+                                | (7 - (_scanline - _spriteScanline[i].Y)));
+                        }
+                    }
+                    else
+                    {
+                        if ((_spriteScanline[i].Attribute & 0x80) == 0)
+                        {
+                            if (_scanline - _spriteScanline[i].Y < 8)
+                            {
+                                sprite_pattern_addr_lo = (ushort)(
+                                    ((_spriteScanline[i].ID & 0x01) << 12)
+                                    | ((_spriteScanline[i].ID & 0xFE) << 4)
+                                    | ((_scanline - _spriteScanline[i].Y) & 0x07));
+                            }
+                            else
+                            {
+                                sprite_pattern_addr_lo = (ushort)(
+                                    ((_spriteScanline[i].ID & 0x01) << 12)
+                                    | (((_spriteScanline[i].ID & 0xFE) + 1) << 4)
+                                    | ((_scanline - _spriteScanline[i].Y) & 0x07));
+                            }
+                        }
+                        else
+                        {
+                            if (_scanline - _spriteScanline[i].Y < 8)
+                            {
+                                sprite_pattern_addr_lo = (ushort)(
+                                    ((_spriteScanline[i].ID & 0x01) << 12)
+                                    | (((_spriteScanline[i].ID & 0xFE) + 1) << 4)
+                                    | (7 - (_scanline - _spriteScanline[i].Y) & 0x07));
+                            }
+                            else
+                            {
+                                sprite_pattern_addr_lo = (ushort)(
+                                    ((_spriteScanline[i].ID & 0x01) << 12)
+                                    | ((_spriteScanline[i].ID & 0xFE) << 4)
+                                    | (7 - (_scanline - _spriteScanline[i].Y) & 0x07));
+                            }
+                        }
+                    }
+
+                    sprite_pattern_addr_hi = (ushort)(sprite_pattern_addr_lo + 8);
+
+                    sprite_pattern_bits_lo = PpuRead(sprite_pattern_addr_lo);
+                    sprite_pattern_bits_hi = PpuRead(sprite_pattern_addr_hi);
+
+                    if ((_spriteScanline[i].Attribute & 0x40) != 0)
+                    {
+                        sprite_pattern_bits_lo = FlipByte(sprite_pattern_bits_lo);
+                        sprite_pattern_bits_hi = FlipByte(sprite_pattern_bits_hi);
+                    }
+
+                    _spriteShifterPatternLo[i] = sprite_pattern_bits_lo;
+                    _spriteShifterPatternHi[i] = sprite_pattern_bits_hi;
+                }
+            }
         }
 
         if (_scanline == 240)
@@ -324,8 +458,8 @@ public partial class Ppu2C02
             if (_control.EnableNmi) Nmi = true;
         }
 
-        byte bg_pixel = 0x00;   // The 2-bit pixel to be rendered
-        byte bg_palette = 0x00; // The 3-bit index of the palette the pixel indexes
+        byte bg_pixel = 0x00;
+        byte bg_palette = 0x00;
 
         if (_mask.RenderBackground)
         {
@@ -341,7 +475,92 @@ public partial class Ppu2C02
             bg_palette = (byte)((bg_pal1 << 1) | bg_pal0);
         }
 
-        _sprScreen.SetPixel(_cycle - 1, _scanline, GetColorFromPaletteRam(bg_palette, bg_pixel));
+        byte fg_pixel = 0x00;
+        byte fg_palette = 0x00;
+        byte fg_priority = 0x00;
+
+        if (_mask.RenderSprites)
+        {
+            _bSpriteZeroBeingRendered = false;
+
+            for (byte i = 0; i < _spriteCount; i++)
+            {
+                if (_spriteScanline[i].X == 0)
+                {
+                    byte fg_pixel_lo = (_spriteShifterPatternLo[i] & 0x80) > 0 ? (byte)1 : (byte)0;
+                    byte fg_pixel_hi = (_spriteShifterPatternHi[i] & 0x80) > 0 ? (byte)1 : (byte)0;
+                    fg_pixel = (byte)((fg_pixel_hi << 1) | fg_pixel_lo);
+
+                    fg_palette = (byte)((_spriteScanline[i].Attribute & 0x03) + 0x04);
+                    fg_priority = (_spriteScanline[i].Attribute & 0x20) == 0 ? (byte)1 : (byte)0;
+
+                    if (fg_pixel != 0)
+                    {
+                        if (i == 0) // Is this sprite zero?
+                        {
+                            _bSpriteZeroBeingRendered = true;
+                        }
+
+                        break;
+                    }
+                }
+            }
+        }
+        
+        byte pixel = 0x00;
+        byte palette = 0x00;
+
+        if (bg_pixel == 0 && fg_pixel == 0)
+        {
+            pixel = 0x00;
+            palette = 0x00;
+        }
+        else if (bg_pixel == 0 && fg_pixel > 0)
+        {
+            pixel = fg_pixel;
+            palette = fg_palette;
+        }
+        else if (bg_pixel > 0 && fg_pixel == 0)
+        {
+            pixel = bg_pixel;
+            palette = bg_palette;
+        }
+        else if (bg_pixel > 0 && fg_pixel > 0)
+        {
+            if (fg_priority != 0)
+            {
+                pixel = fg_pixel;
+                palette = fg_palette;
+            }
+            else
+            {
+                pixel = bg_pixel;
+                palette = bg_palette;
+            }
+
+            if (_bSpriteZeroHitPossible && _bSpriteZeroBeingRendered)
+            {
+                if (_mask.RenderBackground && _mask.RenderSprites)
+                {
+                    if (!(_mask.RenderBackgroundLeft || _mask.RenderSpritesLeft))
+                    {
+                        if (_cycle >= 9 && _cycle < 258)
+                        {
+                            _status.SpriteZeroHit = false;
+                        }
+                    }
+                    else
+                    {
+                        if (_cycle >= 1 && _cycle < 258)
+                        {
+                            _status.SpriteZeroHit = false;
+                        }
+                    }
+                }
+            }
+        }
+
+        _sprScreen.SetPixel(_cycle - 1, _scanline, GetColorFromPaletteRam(palette, pixel));
 
         // Advance renderer - it never stops, it's relentless
         _cycle++;
@@ -355,6 +574,14 @@ public partial class Ppu2C02
                 FrameComplete = true;
             }
         }
+    }
+
+    private byte FlipByte(byte b)
+    {
+        b = (byte)((b & 0xF0) >> 4 | (b & 0x0F) << 4);
+        b = (byte)((b & 0xCC) >> 2 | (b & 0x33) << 2);
+        b = (byte)((b & 0xAA) >> 1 | (b & 0x55) << 1);
+        return b;
     }
 
     // ВРЕМЕННЫЙ ДЕБАГ: рисует индексы тайлов из NameTable цветом
@@ -371,8 +598,8 @@ public partial class Ppu2C02
                 Pixel color = new Pixel((byte)(id * 8), (byte)(id * 4), (byte)(id * 16));
                 // Рисуем квадрат 8x8 пикселей этим цветом
                 for (int py = 0; py < 8; py++)
-                for (int px = 0; px < 8; px++)
-                    _sprScreen.SetPixel(x * 8 + px, y * 8 + py, color);
+                    for (int px = 0; px < 8; px++)
+                        _sprScreen.SetPixel(x * 8 + px, y * 8 + py, color);
             }
         }
     }

@@ -37,6 +37,7 @@ public partial class MainWindow : Window
     private bool _isEmuRunning;
     private byte _selectedPallet = 0;
     private Dictionary<ushort, string> _asmMap = new();
+    private bool _cpuAsm = false; // Флаг для переключения между CPU и OAM отображением
 
     private HashSet<Key> _pressedKeys = new();
 
@@ -139,6 +140,10 @@ public partial class MainWindow : Window
             UpdatePatternTable();
         }
 
+        if (e.Key == Key.O)
+        {
+            _cpuAsm = !_cpuAsm; // Переключение между CPU и OAM отображением
+        }
 
         if (e.Key == Key.C)
         {
@@ -344,7 +349,11 @@ public partial class MainWindow : Window
         if (_pressedKeys.Contains(Key.NumPad4)) state |= 0x02; // Left
         if (_pressedKeys.Contains(Key.NumPad6)) state |= 0x01; // Right
 
-        _pressedKeys.Clear(); // очищаем после чтения
+        // if (_pressedKeys.Contains(Key.Up)) state |= 0x08; // Up
+        // if (_pressedKeys.Contains(Key.Down)) state |= 0x04; // Down
+        // if (_pressedKeys.Contains(Key.Left)) state |= 0x02; // Left
+        // if (_pressedKeys.Contains(Key.Right)) state |= 0x01; // Right
+        
         return state;
     }
 
@@ -382,13 +391,25 @@ public partial class MainWindow : Window
 
         RenderSpriteToImage(_nes.Ppu.GetScreen());
 
-        _asmMap = DisassembleAround(cpu.Pc, 5, 5);
-
-        var disasmSb = new StringBuilder();
-        foreach (var line in _asmMap)
-            disasmSb.AppendLine(line.Key == cpu.Pc ? $"> {line.Value}" : $"  {line.Value}");
-
-        DisassemblyTextBlock.Text = disasmSb.ToString();
+        if (_cpuAsm)
+        {
+            _asmMap = DisassembleAround(cpu.Pc, 5, 5);
+            var disasmSb = new StringBuilder();
+            foreach (var line in _asmMap)
+                disasmSb.AppendLine(line.Key == cpu.Pc ? $"> {line.Value}" : $"  {line.Value}");
+            DisassemblyTextBlock.Text = disasmSb.ToString();
+        }
+        else
+        {
+            var oamSb = new StringBuilder();
+            var oamBytes = _nes.Ppu.OAMAsBytes;
+            for (int i = 0; i < 26; i++)
+            {
+                oamSb.AppendLine($"{i:X2}: ({oamBytes[i * 4 + 3]}, {oamBytes[i * 4 + 0]}) " +
+                               $"ID: {oamBytes[i * 4 + 1]:X2} AT: {oamBytes[i * 4 + 2]:X2}");
+            }
+            DisassemblyTextBlock.Text = oamSb.ToString();
+        }
     }
 
     private async void OnOpenFileClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
