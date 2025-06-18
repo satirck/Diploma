@@ -48,9 +48,6 @@ public partial class MainWindow : Window
         KeyDown += OnKeyDown;
         KeyUp += OnKeyUp;
 
-        MinWidth = 600;
-        MinHeight = 600;
-
         _screenImage = ScreenImage;
         _cpuInfoTextBlock = CpuInfoTextBlock;
         _patternTable0Image = PatternTable0Image;
@@ -79,16 +76,13 @@ public partial class MainWindow : Window
         {
             _flagsNamesRow.Children.Add(new TextBlock
             {
-                Text = name,
-                Margin = new Thickness(4, 0),
-                FontWeight = FontWeight.Bold,
+                Text = name
             });
 
             var valBlock = new TextBlock
             {
                 Text = "0",
-                Margin = new Thickness(4, 0),
-                FontWeight = FontWeight.Bold,
+                Foreground = Brushes.Red
             };
 
             _flagValueBlocks.Add(valBlock);
@@ -108,7 +102,7 @@ public partial class MainWindow : Window
         {
             bool isSet = (status & (byte)flagValues[i]) != 0;
             _flagValueBlocks[i].Text = isSet ? "1" : "0";
-            _flagValueBlocks[i].Foreground = isSet ? Brushes.DarkGreen : Brushes.DarkRed;
+            _flagValueBlocks[i].Foreground = isSet ? Brushes.Lime : Brushes.Red;
         }
     }
 
@@ -347,16 +341,16 @@ public partial class MainWindow : Window
         byte state = 0;
         bool ctrl = _pressedKeys.Contains(Key.LeftCtrl) || _pressedKeys.Contains(Key.RightCtrl);
 
-        if (_pressedKeys.Contains(Key.X)) state |= 0x80;     // A
-        if (_pressedKeys.Contains(Key.Z)) state |= 0x40;     // B
-        if (_pressedKeys.Contains(Key.A)) state |= 0x20;     // Select
-        if (_pressedKeys.Contains(Key.S)) state |= 0x10;     // Start
+        if (_pressedKeys.Contains(Key.J)) state |= 0x80;     // A
+        if (_pressedKeys.Contains(Key.K)) state |= 0x40;     // B
+        if (_pressedKeys.Contains(Key.Space)) state |= 0x20;     // Select
+        if (_pressedKeys.Contains(Key.Return)) state |= 0x10;     // Start
 
         // Теперь вместо стрелок используем Numpad: 8 (Up), 2 (Down), 4 (Left), 6 (Right)
-        if (_pressedKeys.Contains(Key.NumPad8)) state |= 0x08; // Up
-        if (_pressedKeys.Contains(Key.NumPad2)) state |= 0x04; // Down
-        if (_pressedKeys.Contains(Key.NumPad4)) state |= 0x02; // Left
-        if (_pressedKeys.Contains(Key.NumPad6)) state |= 0x01; // Right
+        if (_pressedKeys.Contains(Key.W)) state |= 0x08; // Up
+        if (_pressedKeys.Contains(Key.S)) state |= 0x04; // Down
+        if (_pressedKeys.Contains(Key.A)) state |= 0x02; // Left
+        if (_pressedKeys.Contains(Key.D)) state |= 0x01; // Right
 
         return state;
     }
@@ -388,7 +382,7 @@ public partial class MainWindow : Window
         sb.AppendLine($"Sp = 0x{cpu.Stkp:X2}");
         sb.AppendLine($"Pc = 0x{cpu.Pc:X4}");
         sb.AppendLine($"Opcode = {cpu.Lookup[cpu.Opcode].Name}");
-        sb.AppendLine($"Test Result: 0x{testResult:X4}");
+        sb.Append($"Test Result: 0x{testResult:X4}");
 
         _cpuInfoTextBlock.Text = sb.ToString();
         UpdateFlagUi(cpu.Status);
@@ -402,7 +396,7 @@ public partial class MainWindow : Window
             var disasmSb = new StringBuilder();
             foreach (var line in _asmMap)
                 disasmSb.AppendLine(line.Key == cpu.Pc ? $"> {line.Value}" : $"  {line.Value}");
-            DisassemblyTextBlock.Text = disasmSb.ToString();
+            DisassemblyTextBlock.Text = disasmSb.ToString().TrimEnd();
         }
         else
         {
@@ -413,7 +407,7 @@ public partial class MainWindow : Window
                 oamSb.AppendLine($"{i:X2}: ({oamBytes[i * 4 + 3]}, {oamBytes[i * 4 + 0]}) " +
                                $"ID: {oamBytes[i * 4 + 1]:X2} AT: {oamBytes[i * 4 + 2]:X2}");
             }
-            DisassemblyTextBlock.Text = oamSb.ToString();
+            DisassemblyTextBlock.Text = oamSb.ToString().TrimEnd();
         }
     }
 
