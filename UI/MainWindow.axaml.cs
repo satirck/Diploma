@@ -1,18 +1,18 @@
-using System;
-using System.Collections.Generic;
-using System.Text;
-using System.Timers;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
-using Avalonia.Threading;
 using Avalonia.Platform.Storage;
+using Avalonia.Threading;
 using Devices.Bus.v1;
 using Devices.Cartridge;
 using Devices.CPU;
 using Devices.PPU;
+using System;
+using System.Collections.Generic;
+using System.Text;
+using System.Timers;
 
 namespace UI;
 
@@ -24,7 +24,7 @@ public partial class MainWindow : Window
     private List<TextBlock> _flagValueBlocks = new();
 
     private Image _screenImage;
-    private WriteableBitmap? _bitmap;
+    private WriteableBitmap? _screenBitmap;
 
     private Image _patternTable0Image;
     private Image _patternTable1Image;
@@ -63,9 +63,10 @@ public partial class MainWindow : Window
         _flagsValuesRow = this.FindControl<StackPanel>("FlagsValuesRow")!;
 
         InitFlagUi();
+        InitScreenImage();
 
         _updateTimer = new Timer(16);
-        _updateTimer.Elapsed += (_, _) => Dispatcher.UIThread.Post(UpdateCpuInfo);
+        _updateTimer.Elapsed += (_, _) => Dispatcher.UIThread.Invoke(UpdateCpuInfo);
         _updateTimer.Start();
     }
 
@@ -261,6 +262,20 @@ public partial class MainWindow : Window
         _paletteCanvas.Children.Add(highlight);
     }
 
+    private void InitScreenImage()
+    {
+        const int width = 256;
+        const int height = 240;
+
+        _screenBitmap = new WriteableBitmap(
+            new PixelSize(width, height),
+            new Vector(96, 96),
+            Avalonia.Platform.PixelFormat.Bgra8888,
+            Avalonia.Platform.AlphaFormat.Unpremul);
+
+        _screenImage.Source = _screenBitmap;
+    }
+
     private void RenderSpriteToImage(Sprite sprite)
     {
         const int width = 256;
@@ -272,22 +287,16 @@ public partial class MainWindow : Window
             return;
         }
 
-        _bitmap = new WriteableBitmap(
-            new PixelSize(width, height),
-            new Vector(96, 96),
-            Avalonia.Platform.PixelFormat.Bgra8888,
-            Avalonia.Platform.AlphaFormat.Unpremul);
-
-        using var fb = _bitmap.Lock();
+        using var fb = _screenBitmap!.Lock();
         unsafe
         {
             uint* buffer = (uint*)fb.Address;
             for (int y = 0; y < height; y++)
-            for (int x = 0; x < width; x++)
-                buffer[y * width + x] = sprite.PColData[y * width + x].ToBgra8888();
+                for (int x = 0; x < width; x++)
+                    buffer[y * width + x] = sprite.PColData[y * width + x].ToBgra8888();
         }
 
-        Dispatcher.UIThread.Post(() => { _screenImage.Source = _bitmap; });
+        _screenImage.InvalidateVisual();
     }
 
     private void RenderPatternTable(Sprite sprite, Image imageControl)
@@ -305,11 +314,11 @@ public partial class MainWindow : Window
         {
             uint* buffer = (uint*)fb.Address;
             for (int y = 0; y < height; y++)
-            for (int x = 0; x < width; x++)
-                buffer[y * width + x] = sprite.PColData[y * width + x].ToBgra8888();
+                for (int x = 0; x < width; x++)
+                    buffer[y * width + x] = sprite.PColData[y * width + x].ToBgra8888();
         }
 
-        Dispatcher.UIThread.Post(() => { imageControl.Source = bitmap; });
+        imageControl.Source = bitmap;
     }
 
     private Dictionary<ushort, string> DisassembleAround(ushort pc, int before = 5, int after = 5)
@@ -348,7 +357,7 @@ public partial class MainWindow : Window
         if (_pressedKeys.Contains(Key.NumPad2)) state |= 0x04; // Down
         if (_pressedKeys.Contains(Key.NumPad4)) state |= 0x02; // Left
         if (_pressedKeys.Contains(Key.NumPad6)) state |= 0x01; // Right
-        
+
         return state;
     }
 
