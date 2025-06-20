@@ -1,0 +1,56 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="UI.CartridgeInfoWindow"
+        Title="Cartridge Info"
+		MinWidth="250"
+		CanResize="False"
+		SizeToContent="WidthAndHeight"
+		WindowStartupLocation="CenterScreen"
+        FontSize="14"
+        FontFamily="{StaticResource CourierPrime}"
+        Background="#202020">
+	<Grid Margin="10">
+		<TextBlock Name="NoCartridgeTextBlock"
+				   Text="No cartridge loaded!"
+				   IsVisible="False"/>
+
+		<StackPanel Name="CartridgeInfo"
+					Orientation="Vertical">
+			<StackPanel Orientation="Horizontal">
+				<TextBlock Text="Mapper: " Foreground="#C0C0C0"/>
+				<TextBlock Name="MapperName"/>
+				<TextBlock Text=" (ID: " Foreground="#C0C0C0"/>
+				<TextBlock Name="MapperId"/>
+				<TextBlock Text=")" Foreground="#C0C0C0"/>
+			</StackPanel>
+			<StackPanel Orientation="Horizontal">
+				<TextBlock Text="PRG Banks: " Foreground="#C0C0C0"/>
+				<TextBlock Name="PrgBanks"/>
+			</StackPanel>
+			<StackPanel Orientation="Horizontal">
+				<TextBlock Text="CHR Banks: " Foreground="#C0C0C0"/>
+				<TextBlock Name="ChrBanks"/>
+			</StackPanel>
+			<StackPanel Orientation="Horizontal">
+				<TextBlock Text="Mirror Mode: " Foreground="#C0C0C0"/>
+				<TextBlock Name="MirrorMode"/>
+			</StackPanel>
+			<StackPanel Orientation="Horizontal">
+				<TextBlock Text="Has Trainer: " Foreground="#C0C0C0"/>
+				<TextBlock Name="HasTrainer"/>
+			</StackPanel>
+			<StackPanel Orientation="Horizontal">
+				<TextBlock Text="Is Valid: " Foreground="#C0C0C0"/>
+				<TextBlock Name="IsValid"/>
+			</StackPanel>
+			<StackPanel Orientation="Horizontal">
+				<TextBlock Text="TV System: " Foreground="#C0C0C0"/>
+				<TextBlock Name="TvSystem"/>
+			</StackPanel>
+			<StackPanel Orientation="Horizontal">
+				<TextBlock Text="File Format: " Foreground="#C0C0C0"/>
+				<TextBlock Name="FileFormat"/>
+			</StackPanel>
+		</StackPanel>
+	</Grid>
+</Window>

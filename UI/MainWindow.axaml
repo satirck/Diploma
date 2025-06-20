@@ -1,35 +1,35 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="NES Emulator"
         x:Class="UI.MainWindow"
+        Title="NES Emulator"
         MinWidth="900" MinHeight="600"
 		SizeToContent="Width"
 		WindowStartupLocation="CenterScreen"
         FontSize="14"
         FontFamily="{StaticResource CourierPrime}"
-        Background="#202020">
+        Background="#202020"
+		Loaded="Window_Loaded"
+		KeyDown="Window_KeyDown"
+		KeyUp="Window_KeyUp">
 	<DockPanel Margin="10">
-		<Grid DockPanel.Dock="Top">
-			<Border BorderBrush="White"
-					BorderThickness="2"
-					CornerRadius="6"
-					RenderOptions.EdgeMode="Aliased"/>
-
-			<Border Margin="4"
+		<Border DockPanel.Dock="Top"
+				BorderBrush="White"
+				BorderThickness="2"
+				CornerRadius="6">
+			<Border Margin="2"
 					BorderBrush="White"
 					BorderThickness="2"
-					CornerRadius="4"
-					RenderOptions.EdgeMode="Aliased"/>
+					CornerRadius="4">
+				<Menu Margin="5">
+					<MenuItem Header="File" Focusable="False">
+						<MenuItem Header="Open" Click="FileOpen_Click"/>
+						<MenuItem Header="Cartridge Info..." Click="CartridgeInfo_Click"/>
+					</MenuItem>
+				</Menu>
+			</Border>
+		</Border>
 
-			<Menu Margin="10">
-				<MenuItem Header="File" Focusable="False">
-					<MenuItem Header="Open" Click="OnOpenFileClick"/>
-					<MenuItem Header="Cartridge Info..." Name="CartridgeInfoMenuItem" Click="OnCartridgeInfoClick"/>
-				</MenuItem>
-			</Menu>
-		</Grid>
-
-		<Grid Name="MainGrid" Margin="0,10,0,0">
+		<Grid Margin="0,10,0,0">
 			<Grid.ColumnDefinitions>
 				<ColumnDefinition Width="*"/>
 				<ColumnDefinition Width="10"/>
@@ -38,71 +38,370 @@
 
 			<Border BorderBrush="White"
 					BorderThickness="2"
-					CornerRadius="6"
-					RenderOptions.EdgeMode="Aliased"/>
-
-			<Border Margin="4"
-					BorderBrush="White"
-					BorderThickness="2"
-					CornerRadius="4"
-					RenderOptions.EdgeMode="Aliased"/>
-
-			<Border Margin="10"
-					Width="512" Height="480"
-					Background="#404040">
-				<Image Name="ScreenImage"
-					   Width="512" Height="480"
-					   RenderOptions.BitmapInterpolationMode="None"
-					   Stretch="Fill"/>
+					CornerRadius="6">
+				<Border Margin="2"
+						BorderBrush="White"
+						BorderThickness="2"
+						CornerRadius="4">
+					<Border Margin="5"
+							Width="512" Height="480"
+							Background="#404040">
+						<Image Name="ScreenImage"
+							   Width="512" Height="480"
+							   RenderOptions.BitmapInterpolationMode="None"
+							   Stretch="Fill"/>
+					</Border>
+				</Border>
 			</Border>
 
 			<Border Grid.Column="2"
 					BorderBrush="White"
 					BorderThickness="2"
-					CornerRadius="6"
-					RenderOptions.EdgeMode="Aliased"/>
+					CornerRadius="6">
+				<Border Margin="2"
+						BorderBrush="White"
+						BorderThickness="2"
+						CornerRadius="4">
+					<ScrollViewer Margin="5">
+						<StackPanel Margin="10"
+									Orientation="Vertical"
+									Spacing="10">
+							<StackPanel Orientation="Vertical">
+								<StackPanel Orientation="Horizontal">
+									<TextBlock Text="A  = " Foreground="#C0C0C0"/>
+									<TextBlock Name="A" Text="0x00"/>
+								</StackPanel>
 
-			<Border Grid.Column="2"
-					Margin="4"
-					BorderBrush="White"
-					BorderThickness="2"
-					CornerRadius="4"
-					RenderOptions.EdgeMode="Aliased"/>
+								<StackPanel Orientation="Horizontal">
+									<TextBlock Text="X  = " Foreground="#C0C0C0"/>
+									<TextBlock Name="X" Text="0x00"/>
+								</StackPanel>
 
-			<ScrollViewer Grid.Column="2"
-						  Margin="10">
-				<StackPanel Margin="10"
-							Spacing="10">
-					<TextBlock Name="CpuInfoTextBlock"
-                               Text="CPU Info"
-                               TextWrapping="Wrap"/>
+								<StackPanel Orientation="Horizontal">
+									<TextBlock Text="Y  = " Foreground="#C0C0C0"/>
+									<TextBlock Name="Y" Text="0x00"/>
+								</StackPanel>
 
-					<!-- Флаги -->
-					<StackPanel Name="FlagsPanel"
-                                Orientation="Vertical">
-						<StackPanel Name="FlagsNamesRow"
-									Spacing="10"
-                                    Orientation="Horizontal"/>
-						<StackPanel Name="FlagsValuesRow"
-									Spacing="10"
-                                    Orientation="Horizontal"/>
-					</StackPanel>
+								<StackPanel Orientation="Horizontal">
+									<TextBlock Text="Sp = " Foreground="#C0C0C0"/>
+									<TextBlock Name="Sp" Text="0x00"/>
+								</StackPanel>
 
-					<StackPanel Spacing="10"
-								Orientation="Horizontal">
-						<Image Name="PatternTable0Image"
-                               Width="128" Height="128"/>
-						<Image Name="PatternTable1Image"
-                               Width="128" Height="128"/>
-					</StackPanel>
+								<StackPanel Orientation="Horizontal">
+									<TextBlock Text="Pc = " Foreground="#C0C0C0"/>
+									<TextBlock Name="Pc" Text="0x0000"/>
+								</StackPanel>
 
-					<Canvas Name="PaletteCanvas"
-							Width="80" Height="10"/>
+								<StackPanel Orientation="Horizontal">
+									<TextBlock Text="Opcode = " Foreground="#C0C0C0"/>
+									<TextBlock Name="Opcode" Text="???"/>
+								</StackPanel>
 
-					<TextBlock Name="DisassemblyTextBlock"
-							   TextWrapping="Wrap"/>
-				</StackPanel>
-			</ScrollViewer>
+								<StackPanel Orientation="Horizontal">
+									<TextBlock Text="Test Result = " Foreground="#C0C0C0"/>
+									<TextBlock Name="TestResult" Text="0x0000"/>
+								</StackPanel>
+							</StackPanel>
+
+							<StackPanel Orientation="Horizontal"
+										Spacing="10">
+								<StackPanel Orientation="Vertical"
+											Spacing="5">
+									<TextBlock Text="N"
+											   Foreground="#C0C0C0"
+											   HorizontalAlignment="Center"/>
+									<Ellipse Name="N"
+											 Width="6" Height="6"
+											 HorizontalAlignment="Center"
+											 Fill="Red"/>
+								</StackPanel>
+
+								<StackPanel Orientation="Vertical"
+											Spacing="5">
+									<TextBlock Text="V"
+											   Foreground="#C0C0C0"
+											   HorizontalAlignment="Center"/>
+									<Ellipse Name="V"
+											 Width="6" Height="6"
+											 HorizontalAlignment="Center"
+											 Fill="Red"/>
+								</StackPanel>
+
+								<StackPanel Orientation="Vertical"
+											Spacing="5">
+									<TextBlock Text="U"
+											   Foreground="#C0C0C0"
+											   HorizontalAlignment="Center"/>
+									<Ellipse Name="U"
+											 Width="6" Height="6"
+											 HorizontalAlignment="Center"
+											 Fill="Red"/>
+								</StackPanel>
+
+								<StackPanel Orientation="Vertical"
+											Spacing="5">
+									<TextBlock Text="B"
+											   Foreground="#C0C0C0"
+											   HorizontalAlignment="Center"/>
+									<Ellipse Name="B"
+											 Width="6" Height="6"
+											 HorizontalAlignment="Center"
+											 Fill="Red"/>
+								</StackPanel>
+
+								<StackPanel Orientation="Vertical"
+											Spacing="5">
+									<TextBlock Text="D"
+											   Foreground="#C0C0C0"
+											   HorizontalAlignment="Center"/>
+									<Ellipse Name="D"
+											 Width="6" Height="6"
+											 HorizontalAlignment="Center"
+											 Fill="Red"/>
+								</StackPanel>
+
+								<StackPanel Orientation="Vertical"
+											Spacing="5">
+									<TextBlock Text="I"
+											   Foreground="#C0C0C0"
+											   HorizontalAlignment="Center"/>
+									<Ellipse Name="I"
+											 Width="6" Height="6"
+											 HorizontalAlignment="Center"
+											 Fill="Red"/>
+								</StackPanel>
+
+								<StackPanel Orientation="Vertical"
+											Spacing="5">
+									<TextBlock Text="Z"
+											   Foreground="#C0C0C0"
+											   HorizontalAlignment="Center"/>
+									<Ellipse Name="Z"
+											 Width="6" Height="6"
+											 HorizontalAlignment="Center"
+											 Fill="Red"/>
+								</StackPanel>
+
+								<StackPanel Orientation="Vertical"
+											Spacing="5">
+									<TextBlock Text="C"
+											   Foreground="#C0C0C0"
+											   HorizontalAlignment="Center"/>
+									<Ellipse Name="C"
+											 Width="6" Height="6"
+											 HorizontalAlignment="Center"
+											 Fill="Red"/>
+								</StackPanel>
+							</StackPanel>
+
+							<StackPanel Orientation="Horizontal"
+										Spacing="15">
+								<Border Width="128" Height="128"
+										Background="#404040">
+									<Image Name="PatternTable0Image"
+										   Width="128" Height="128"
+										   RenderOptions.BitmapInterpolationMode="None"/>
+								</Border>
+
+								<Border Width="128" Height="128"
+										Background="#404040">
+									<Image Name="PatternTable1Image"
+										   Width="128" Height="128"
+										   RenderOptions.BitmapInterpolationMode="None"/>
+								</Border>
+							</StackPanel>
+
+							<StackPanel Name="Palettes"
+										Orientation="Vertical"
+										HorizontalAlignment="Center">
+								<StackPanel Orientation="Horizontal">
+									<Grid>
+										<StackPanel Margin="4"
+													Orientation="Horizontal">
+											<Rectangle Width="12" Height="12"
+													   Fill="#404040"/>
+											<Rectangle Width="12" Height="12"
+													   Fill="#404040"/>
+											<Rectangle Width="12" Height="12"
+													   Fill="#404040"/>
+											<Rectangle Width="12" Height="12"
+													   Fill="#404040"/>
+										</StackPanel>
+
+										<Border BorderBrush="White"
+												BorderThickness="2"/>
+									</Grid>
+
+									<Grid>
+										<StackPanel Margin="4"
+													Orientation="Horizontal">
+											<Rectangle Width="12" Height="12"
+													   Fill="#404040"/>
+											<Rectangle Width="12" Height="12"
+													   Fill="#404040"/>
+											<Rectangle Width="12" Height="12"
+													   Fill="#404040"/>
+											<Rectangle Width="12" Height="12"
+													   Fill="#404040"/>
+										</StackPanel>
+
+										<Border BorderBrush="White"
+												BorderThickness="2"
+												IsVisible="False"/>
+									</Grid>
+
+									<Grid>
+										<StackPanel Margin="4"
+													Orientation="Horizontal">
+											<Rectangle Width="12" Height="12"
+													   Fill="#404040"/>
+											<Rectangle Width="12" Height="12"
+													   Fill="#404040"/>
+											<Rectangle Width="12" Height="12"
+													   Fill="#404040"/>
+											<Rectangle Width="12" Height="12"
+													   Fill="#404040"/>
+										</StackPanel>
+
+										<Border BorderBrush="White"
+												BorderThickness="2"
+												IsVisible="False"/>
+									</Grid>
+
+									<Grid>
+										<StackPanel Margin="4"
+													Orientation="Horizontal">
+											<Rectangle Width="12" Height="12"
+													   Fill="#404040"/>
+											<Rectangle Width="12" Height="12"
+													   Fill="#404040"/>
+											<Rectangle Width="12" Height="12"
+													   Fill="#404040"/>
+											<Rectangle Width="12" Height="12"
+													   Fill="#404040"/>
+										</StackPanel>
+
+										<Border BorderBrush="White"
+												BorderThickness="2"
+												IsVisible="False"/>
+									</Grid>
+								</StackPanel>
+
+								<StackPanel Orientation="Horizontal">
+									<Grid>
+										<StackPanel Margin="4"
+													Orientation="Horizontal">
+											<Rectangle Width="12" Height="12"
+													   Fill="#404040"/>
+											<Rectangle Width="12" Height="12"
+													   Fill="#404040"/>
+											<Rectangle Width="12" Height="12"
+													   Fill="#404040"/>
+											<Rectangle Width="12" Height="12"
+													   Fill="#404040"/>
+										</StackPanel>
+
+										<Border BorderBrush="White"
+												BorderThickness="2"
+												IsVisible="False"/>
+									</Grid>
+
+									<Grid>
+										<StackPanel Margin="4"
+													Orientation="Horizontal">
+											<Rectangle Width="12" Height="12"
+													   Fill="#404040"/>
+											<Rectangle Width="12" Height="12"
+													   Fill="#404040"/>
+											<Rectangle Width="12" Height="12"
+													   Fill="#404040"/>
+											<Rectangle Width="12" Height="12"
+													   Fill="#404040"/>
+										</StackPanel>
+
+										<Border BorderBrush="White"
+												BorderThickness="2"
+												IsVisible="False"/>
+									</Grid>
+
+									<Grid>
+										<StackPanel Margin="4"
+													Orientation="Horizontal">
+											<Rectangle Width="12" Height="12"
+													   Fill="#404040"/>
+											<Rectangle Width="12" Height="12"
+													   Fill="#404040"/>
+											<Rectangle Width="12" Height="12"
+													   Fill="#404040"/>
+											<Rectangle Width="12" Height="12"
+													   Fill="#404040"/>
+										</StackPanel>
+
+										<Border BorderBrush="White"
+												BorderThickness="2"
+												IsVisible="False"/>
+									</Grid>
+
+									<Grid>
+										<StackPanel Margin="4"
+													Orientation="Horizontal">
+											<Rectangle Width="12" Height="12"
+													   Fill="#404040"/>
+											<Rectangle Width="12" Height="12"
+													   Fill="#404040"/>
+											<Rectangle Width="12" Height="12"
+													   Fill="#404040"/>
+											<Rectangle Width="12" Height="12"
+													   Fill="#404040"/>
+										</StackPanel>
+
+										<Border BorderBrush="White"
+												BorderThickness="2"
+												IsVisible="False"/>
+									</Grid>
+								</StackPanel>
+							</StackPanel>
+
+							<Grid>
+								<Grid.RowDefinitions>
+									<RowDefinition Height="35"/>
+								</Grid.RowDefinitions>
+								<Grid.ColumnDefinitions>
+									<ColumnDefinition/>
+									<ColumnDefinition Width="15"/>
+									<ColumnDefinition/>
+								</Grid.ColumnDefinitions>
+
+								<ToggleButton Name="AsmButton"
+											  Grid.Column="0"
+											  FontSize="16"
+											  IsChecked="true"
+											  Focusable="False"
+											  HorizontalAlignment="Stretch"
+											  VerticalAlignment="Stretch"
+											  HorizontalContentAlignment="Center"
+											  VerticalContentAlignment="Center"
+											  Content="ASM"
+											  Click="AsmButton_Click"/>
+								<ToggleButton Name="OamButton"
+											  Grid.Column="2"
+											  FontSize="16"
+											  Focusable="False"
+											  HorizontalAlignment="Stretch"
+											  VerticalAlignment="Stretch"
+											  HorizontalContentAlignment="Center"
+											  VerticalContentAlignment="Center"
+											  Content="OAM"
+											  Click="OamButton_Click"/>
+							</Grid>
+
+							<TextBlock Name="AsmTextBlock"/>
+							<TextBlock Name="OamTextBlock"
+									   IsVisible="False"/>
+						</StackPanel>
+					</ScrollViewer>
+				</Border>
+			</Border>
 		</Grid>
 	</DockPanel>
 </Window>

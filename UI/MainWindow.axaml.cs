@@ -1,8 +1,10 @@
-using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Shapes;
 using Avalonia.Input;
+using Avalonia.Interactivity;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
+using Avalonia.Platform;
 using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using Devices.Bus.v1;
@@ -18,262 +20,103 @@ namespace UI;
 
 public partial class MainWindow : Window
 {
-    private TextBlock _cpuInfoTextBlock;
-    private StackPanel _flagsNamesRow;
-    private StackPanel _flagsValuesRow;
-    private List<TextBlock> _flagValueBlocks = new();
+    private Cartridge? _cart = null;
+    private readonly Bus _nes = new();
+    private readonly Timer _timer = new(1000d / 60d);
 
-    private Image _screenImage;
-    private WriteableBitmap? _screenBitmap;
-
-    private Image _patternTable0Image;
-    private Image _patternTable1Image;
-    private Canvas _paletteCanvas;
-
-    private Timer _updateTimer;
-    private Bus? _nes;
-    private Cartridge? _cart;
-
-    private bool _isEmuRunning;
-    private byte _selectedPallet = 0;
-    private Dictionary<ushort, string> _asmMap = new();
-    private bool _cpuAsm = true; // Флаг для переключения между CPU и OAM отображением
-
-    private HashSet<Key> _pressedKeys = new();
+    private bool _isEmuRunning = false;
+    private byte _selectedPalette = 0;
+    private readonly HashSet<Key> _pressedKeys = [];
 
     public MainWindow()
     {
         InitializeComponent();
-        DisassemblyTextBlock = this.FindControl<TextBlock>("DisassemblyTextBlock");
-        KeyDown += OnKeyDown;
-        KeyUp += OnKeyUp;
-
-        _screenImage = ScreenImage;
-        _cpuInfoTextBlock = CpuInfoTextBlock;
-        _patternTable0Image = PatternTable0Image;
-        _patternTable1Image = PatternTable1Image;
-        _paletteCanvas = this.FindControl<Canvas>("PaletteCanvas")!;
-        _paletteCanvas.Width = 16 * 8 + 6; // 16 squares * 8 pixels + 6 pixels for gaps
-        _paletteCanvas.Height = 16 + 2; // 2 rows * 8 pixels + 2 pixels gap
-
-        _flagsNamesRow = this.FindControl<StackPanel>("FlagsNamesRow")!;
-        _flagsValuesRow = this.FindControl<StackPanel>("FlagsValuesRow")!;
-
-        InitFlagUi();
-        InitScreenImage();
-
-        _updateTimer = new Timer(16);
-        _updateTimer.Elapsed += (_, _) => Dispatcher.UIThread.Invoke(UpdateCpuInfo);
-        _updateTimer.Start();
     }
 
-    private void InitFlagUi()
+    private void UpdateRegisters()
     {
-        var flagNames = new[] { "N", "V", "U", "B", "D", "I", "Z", "C" };
-        _flagValueBlocks = new List<TextBlock>();
-
-        foreach (var name in flagNames)
-        {
-            _flagsNamesRow.Children.Add(new TextBlock
-            {
-                Text = name
-            });
-
-            var valBlock = new TextBlock
-            {
-                Text = "0",
-                Foreground = Brushes.Red
-            };
-
-            _flagValueBlocks.Add(valBlock);
-            _flagsValuesRow.Children.Add(valBlock);
-        }
+        A.Text = $"0x{_nes.Cpu.A:X2}";
+        X.Text = $"0x{_nes.Cpu.X:X2}";
+        Y.Text = $"0x{_nes.Cpu.Y:X2}";
+        Sp.Text = $"0x{_nes.Cpu.Stkp:X2}";
+        Pc.Text = $"0x{_nes.Cpu.Pc:X4}";
+        Opcode.Text = $"{_nes.Cpu.Lookup[_nes.Cpu.Opcode].Name}";
+        TestResult.Text = $"0x{(ushort)(_nes.CpuRead(0x0002) | (_nes.CpuRead(0x0003) << 8)):X4}";
     }
 
-    private void UpdateFlagUi(byte status)
+    private void UpdateFlags()
     {
-        var flagValues = new[]
-        {
-            Flags6502.N, Flags6502.V, Flags6502.U, Flags6502.B,
-            Flags6502.D, Flags6502.I, Flags6502.Z, Flags6502.C
-        };
+        N.Fill = (_nes.Cpu.Status & (byte)Flags6502.N) != 0 ? Brushes.Lime : Brushes.Red;
+        V.Fill = (_nes.Cpu.Status & (byte)Flags6502.V) != 0 ? Brushes.Lime : Brushes.Red;
+        U.Fill = (_nes.Cpu.Status & (byte)Flags6502.U) != 0 ? Brushes.Lime : Brushes.Red;
+        B.Fill = (_nes.Cpu.Status & (byte)Flags6502.B) != 0 ? Brushes.Lime : Brushes.Red;
+        D.Fill = (_nes.Cpu.Status & (byte)Flags6502.D) != 0 ? Brushes.Lime : Brushes.Red;
+        I.Fill = (_nes.Cpu.Status & (byte)Flags6502.I) != 0 ? Brushes.Lime : Brushes.Red;
+        Z.Fill = (_nes.Cpu.Status & (byte)Flags6502.Z) != 0 ? Brushes.Lime : Brushes.Red;
+        C.Fill = (_nes.Cpu.Status & (byte)Flags6502.C) != 0 ? Brushes.Lime : Brushes.Red;
+    }
 
-        for (int i = 0; i < flagValues.Length; i++)
+    private void UpdatePatternTables()
+    {
+        RenderSpriteToImage(_nes.Ppu.GetPatternTable(0, _selectedPalette), PatternTable0Image);
+        RenderSpriteToImage(_nes.Ppu.GetPatternTable(1, _selectedPalette), PatternTable1Image);
+    }
+
+    private void UpdatePalettes()
+    {
+        for (int i = 0; i < Palettes.Children.Count; i++)
         {
-            bool isSet = (status & (byte)flagValues[i]) != 0;
-            _flagValueBlocks[i].Text = isSet ? "1" : "0";
-            _flagValueBlocks[i].Foreground = isSet ? Brushes.Lime : Brushes.Red;
+            StackPanel row = (StackPanel)Palettes.Children[i];
+
+            for (int j = 0; j < row.Children.Count; j++)
+            {
+                Grid grid = (Grid)row.Children[j];
+                StackPanel palette = (StackPanel)grid.Children[0];
+                Border border = (Border)grid.Children[1];
+
+                byte currentPalette = (byte)(i * row.Children.Count + j);
+                border.IsVisible = currentPalette == _selectedPalette;
+
+                for (int k = 0; k < palette.Children.Count; k++)
+                {
+                    Pixel color = _nes.Ppu.GetColorFromPaletteRam(currentPalette, (byte)k);
+                    Rectangle rectangle = (Rectangle)palette.Children[k];
+                    rectangle.Fill = new SolidColorBrush(color.ToBgra8888());
+                }
+            }
         }
     }
 
-    private void OnKeyDown(object? sender, KeyEventArgs e)
+    private void UpdateAssembly()
     {
-        _pressedKeys.Add(e.Key);
-        if (_nes == null) return;
+        Dictionary<ushort, string> asmMap = DisassembleAround(_nes.Cpu.Pc, 5, 5);
 
-        if (e.Key == Key.R)
-        {
-            _nes.Cpu.Reset();
-            _isEmuRunning = false;
-        }
+        StringBuilder asmSb = new();
+        foreach (var line in asmMap)
+            asmSb.AppendLine(line.Key == _nes.Cpu.Pc ? $"> {line.Value}" : $"  {line.Value}");
 
-        if (e.Key == Key.U)
-        {
-            UpdatePatternTable();
-        }
-
-        if (e.Key == Key.P)
-        {
-            _isEmuRunning = !_isEmuRunning;
-        }
-
-        if (e.Key == Key.N)
-        {
-            ++_selectedPallet;
-            _selectedPallet &= 0x07;
-
-            UpdatePatternTable();
-        }
-
-        if (e.Key == Key.O)
-        {
-            _cpuAsm = !_cpuAsm; // Переключение между CPU и OAM отображением
-        }
-
-        if (e.Key == Key.C)
-        {
-            do
-            {
-                _nes.Clock();
-            } while (!_nes.Cpu.Complete());
-
-            do
-            {
-                _nes.Clock();
-            } while (_nes.Cpu.Complete());
-        }
-
-        if (e.Key == Key.F)
-        {
-            do
-            {
-                _nes.Clock();
-            } while (!_nes.Ppu.FrameComplete);
-
-            do
-            {
-                _nes.Clock();
-            } while (!_nes.Cpu.Complete());
-
-            _nes.Ppu.FrameComplete = false;
-        }
+        AsmTextBlock.Text = asmSb.ToString().TrimEnd();
     }
 
-    private void OnKeyUp(object? sender, KeyEventArgs e)
+    private void UpdateOam()
     {
-        _pressedKeys.Remove(e.Key);
-    }
+        Span<byte> oamBytes = _nes.Ppu.OAMAsBytes;
 
-    private void UpdatePatternTable()
-    {
-        if (_nes == null) return;
-
-        RenderPatternTable(_nes.Ppu.GetPatternTable(0, _selectedPallet), _patternTable0Image);
-        RenderPatternTable(_nes.Ppu.GetPatternTable(1, _selectedPallet), _patternTable1Image);
-
-        UpdatePaletteDisplay();
-    }
-
-    private void UpdatePaletteDisplay()
-    {
-        if (_nes == null) return;
-
-        _paletteCanvas.Children.Clear();
-        const int squareSize = 8;
-        const int squaresPerRow = 16;
-        const int totalSquares = 32;
-        const int gapSize = 2;
-
-        // Сначала рисуем фоновые прямоугольники для групп (без выделения)
-        for (int group = 0; group < 8; group++)
+        StringBuilder oamSb = new();
+        for (int i = 0; i < 26; i++)
         {
-            int row = group / 4;
-            int col = group % 4;
-            var groupRect = new Border
-            {
-                Width = squareSize * 4 + gapSize * 3,
-                Height = squareSize + gapSize,
-                BorderBrush = Brushes.DarkGray,
-                BorderThickness = new Thickness(0.5)
-            };
-            int xOffset = col * (squareSize * 4 + gapSize * 3);
-            int yOffset = row * (squareSize + gapSize);
-            Canvas.SetLeft(groupRect, xOffset);
-            Canvas.SetTop(groupRect, yOffset);
-            _paletteCanvas.Children.Add(groupRect);
+            oamSb.Append($"{i:X2}: ({oamBytes[i * 4 + 3],3}, {oamBytes[i * 4 + 0],3}) ");
+            oamSb.AppendLine($"ID: {oamBytes[i * 4 + 1]:X2} AT: {oamBytes[i * 4 + 2]:X2}");
         }
 
-        // Затем рисуем цветные квадратики
-        for (int i = 0; i < totalSquares; i++)
-        {
-            int row = i / squaresPerRow;
-            int col = i % squaresPerRow;
-            byte palette = (byte)(i / 4);
-            byte pixel = (byte)(i % 4);
-            var color = _nes.Ppu.GetColorFromPaletteRam(palette, pixel);
-            int groupCol = col % 4;
-            int groupRow = col / 4;
-            int xOffset = groupRow * (squareSize * 4 + gapSize * 3) + groupCol * squareSize;
-            int yOffset = row * (squareSize + gapSize);
-            var square = new Border
-            {
-                Width = squareSize,
-                Height = squareSize,
-                Background = new SolidColorBrush(Color.FromUInt32(color.ToBgra8888())),
-                BorderBrush = Brushes.Black,
-                BorderThickness = new Thickness(0.5)
-            };
-            Canvas.SetLeft(square, xOffset);
-            Canvas.SetTop(square, yOffset);
-            _paletteCanvas.Children.Add(square);
-        }
-
-        // В конце рисуем жёлтую рамку поверх выбранной группы
-        int selRow = _selectedPallet / 4;
-        int selCol = _selectedPallet % 4;
-        int selX = selCol * (squareSize * 4 + gapSize * 3);
-        int selY = selRow * (squareSize + gapSize);
-        var highlight = new Border
-        {
-            Width = squareSize * 4,
-            Height = squareSize + gapSize,
-            BorderBrush = Brushes.Yellow,
-            BorderThickness = new Thickness(2),
-            Background = null
-        };
-        Canvas.SetLeft(highlight, selX);
-        Canvas.SetTop(highlight, selY);
-        _paletteCanvas.Children.Add(highlight);
+        OamTextBlock.Text = oamSb.ToString().TrimEnd();
     }
 
-    private void InitScreenImage()
+    private unsafe void RenderSpriteToImage(Sprite sprite, Image image)
     {
-        const int width = 256;
-        const int height = 240;
-
-        _screenBitmap = new WriteableBitmap(
-            new PixelSize(width, height),
-            new Vector(96, 96),
-            Avalonia.Platform.PixelFormat.Bgra8888,
-            Avalonia.Platform.AlphaFormat.Unpremul);
-
-        _screenImage.Source = _screenBitmap;
-    }
-
-    private void RenderSpriteToImage(Sprite sprite)
-    {
-        const int width = 256;
-        const int height = 240;
+        WriteableBitmap bitmap = (WriteableBitmap)image.Source!;
+        int width = bitmap.PixelSize.Width;
+        int height = bitmap.PixelSize.Height;
 
         if (sprite.PColData.Count != width * height)
         {
@@ -281,54 +124,29 @@ public partial class MainWindow : Window
             return;
         }
 
-        using var fb = _screenBitmap!.Lock();
-        unsafe
-        {
-            uint* buffer = (uint*)fb.Address;
-            for (int y = 0; y < height; y++)
-                for (int x = 0; x < width; x++)
-                    buffer[y * width + x] = sprite.PColData[y * width + x].ToBgra8888();
-        }
-
-        _screenImage.InvalidateVisual();
-    }
-
-    private void RenderPatternTable(Sprite sprite, Image imageControl)
-    {
-        int width = 128, height = 128;
-
-        var bitmap = new WriteableBitmap(
-            new PixelSize(width, height),
-            new Vector(96, 96),
-            Avalonia.Platform.PixelFormat.Bgra8888,
-            Avalonia.Platform.AlphaFormat.Unpremul);
-
         using var fb = bitmap.Lock();
-        unsafe
-        {
-            uint* buffer = (uint*)fb.Address;
-            for (int y = 0; y < height; y++)
-                for (int x = 0; x < width; x++)
-                    buffer[y * width + x] = sprite.PColData[y * width + x].ToBgra8888();
-        }
 
-        imageControl.Source = bitmap;
+        uint* buffer = (uint*)fb.Address;
+        for (int y = 0; y < height; y++)
+            for (int x = 0; x < width; x++)
+                buffer[y * width + x] = sprite.PColData[y * width + x].ToBgra8888();
+
+        image.InvalidateVisual();
     }
 
     private Dictionary<ushort, string> DisassembleAround(ushort pc, int before = 5, int after = 5)
     {
-        var map = new Dictionary<ushort, string>();
         ushort scanStart = (ushort)(pc > 0x20 ? pc - 0x20 : 0x0000);
-        var tempMap = _nes!.Cpu.Disassemble(scanStart, (ushort)(pc + 0x20));
-        var keys = new List<ushort>(tempMap.Keys);
-        keys.Sort();
+        Dictionary<ushort, string> tempMap = _nes.Cpu.Disassemble(scanStart, (ushort)(pc + 0x20));
+        List<ushort> keys = [.. tempMap.Keys]; keys.Sort();
 
         int pcIndex = keys.FindIndex(k => k == pc);
         if (pcIndex == -1)
             pcIndex = keys.FindLastIndex(k => k < pc);
 
-        int startIndex = Math.Max(pcIndex - before, 0);
-        int endIndex = Math.Min(pcIndex + after, keys.Count - 1);
+        int startIndex = int.Max(pcIndex - before, 0);
+        int endIndex = int.Min(pcIndex + after, keys.Count - 1);
+        Dictionary<ushort, string> map = new(before + after + 1);
 
         for (int i = startIndex; i <= endIndex; i++)
             map[keys[i]] = tempMap[keys[i]];
@@ -339,25 +157,23 @@ public partial class MainWindow : Window
     private byte PollController()
     {
         byte state = 0;
-        bool ctrl = _pressedKeys.Contains(Key.LeftCtrl) || _pressedKeys.Contains(Key.RightCtrl);
 
-        if (_pressedKeys.Contains(Key.J)) state |= 0x80;     // A
-        if (_pressedKeys.Contains(Key.K)) state |= 0x40;     // B
-        if (_pressedKeys.Contains(Key.Space)) state |= 0x20;     // Select
-        if (_pressedKeys.Contains(Key.Return)) state |= 0x10;     // Start
+        if (_pressedKeys.Contains(Key.J)) state |= 0x80;        // A
+        if (_pressedKeys.Contains(Key.K)) state |= 0x40;        // B
+        if (_pressedKeys.Contains(Key.Space)) state |= 0x20;    // Select
+        if (_pressedKeys.Contains(Key.Return)) state |= 0x10;   // Start
 
-        // Теперь вместо стрелок используем Numpad: 8 (Up), 2 (Down), 4 (Left), 6 (Right)
-        if (_pressedKeys.Contains(Key.W)) state |= 0x08; // Up
-        if (_pressedKeys.Contains(Key.S)) state |= 0x04; // Down
-        if (_pressedKeys.Contains(Key.A)) state |= 0x02; // Left
-        if (_pressedKeys.Contains(Key.D)) state |= 0x01; // Right
+        if (_pressedKeys.Contains(Key.W)) state |= 0x08;        // Up
+        if (_pressedKeys.Contains(Key.S)) state |= 0x04;        // Down
+        if (_pressedKeys.Contains(Key.A)) state |= 0x02;        // Left
+        if (_pressedKeys.Contains(Key.D)) state |= 0x01;        // Right
 
         return state;
     }
 
     private void UpdateCpuInfo()
     {
-        if (_nes == null) return;
+        if (_cart == null) return;
 
         _nes.Controller[0] = PollController();
 
@@ -371,136 +187,121 @@ public partial class MainWindow : Window
             _nes.Ppu.FrameComplete = false;
         }
 
-        var cpu = _nes.Cpu;
-        var sb = new StringBuilder();
-
-        ushort testResult = (ushort)(_nes.CpuRead(0x0002) | (_nes.CpuRead(0x0003) << 8));
-
-        sb.AppendLine($"A  = 0x{cpu.A:X2}");
-        sb.AppendLine($"X  = 0x{cpu.X:X2}");
-        sb.AppendLine($"Y  = 0x{cpu.Y:X2}");
-        sb.AppendLine($"Sp = 0x{cpu.Stkp:X2}");
-        sb.AppendLine($"Pc = 0x{cpu.Pc:X4}");
-        sb.AppendLine($"Opcode = {cpu.Lookup[cpu.Opcode].Name}");
-        sb.Append($"Test Result: 0x{testResult:X4}");
-
-        _cpuInfoTextBlock.Text = sb.ToString();
-        UpdateFlagUi(cpu.Status);
-
-        RenderSpriteToImage(_nes.Ppu.GetScreen());
-        UpdatePatternTable();
-
-        if (_cpuAsm)
-        {
-            _asmMap = DisassembleAround(cpu.Pc, 5, 5);
-            var disasmSb = new StringBuilder();
-            foreach (var line in _asmMap)
-                disasmSb.AppendLine(line.Key == cpu.Pc ? $"> {line.Value}" : $"  {line.Value}");
-            DisassemblyTextBlock.Text = disasmSb.ToString().TrimEnd();
-        }
-        else
-        {
-            var oamSb = new StringBuilder();
-            var oamBytes = _nes.Ppu.OAMAsBytes;
-            for (int i = 0; i < 26; i++)
-            {
-                oamSb.AppendLine($"{i:X2}: ({oamBytes[i * 4 + 3]}, {oamBytes[i * 4 + 0]}) " +
-                               $"ID: {oamBytes[i * 4 + 1]:X2} AT: {oamBytes[i * 4 + 2]:X2}");
-            }
-            DisassemblyTextBlock.Text = oamSb.ToString().TrimEnd();
-        }
+        RenderSpriteToImage(_nes.Ppu.GetScreen(), ScreenImage);
+        UpdateRegisters();
+        UpdateFlags();
+        UpdatePatternTables();
+        UpdatePalettes();
+        UpdateAssembly();
+        UpdateOam();
     }
 
-    private async void OnOpenFileClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private async void FileOpen_Click(object? sender, RoutedEventArgs e)
     {
-        var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        IReadOnlyList<IStorageFile> files = await StorageProvider.OpenFilePickerAsync(new()
         {
             Title = "Open NES ROM",
             AllowMultiple = false,
-            FileTypeFilter = new[]
-            {
-                new FilePickerFileType("NES ROMs")
-                {
-                    Patterns = new[] { "*.nes" }
-                }
-            }
+            FileTypeFilter = [new("NES ROMs") { Patterns = ["*.nes"] }]
         });
 
-        if (files.Count > 0 && files[0] is { } file)
+        if (files.Count > 0)
         {
-            var path = file.Path.LocalPath;
             try
             {
-                _cart = new Cartridge(path);
-                _nes = new Bus();
+                _cart = new(files[0].Path.LocalPath);
                 _nes.InsertCartridge(_cart);
                 _isEmuRunning = true;
                 _nes.Cpu.Reset();
-                UpdatePatternTable();
             }
             catch (Exception ex)
             {
-                var dialog = new Window
-                {
-                    Title = "Error",
-                    Content = new TextBlock
-                    {
-                        Text = $"Failed to load ROM: {ex.Message}",
-                        Margin = new Thickness(20),
-                        TextWrapping = TextWrapping.Wrap
-                    },
-                    SizeToContent = SizeToContent.WidthAndHeight,
-                    WindowStartupLocation = WindowStartupLocation.CenterOwner
-                };
-                await dialog.ShowDialog(this);
+                ErrorWindow errorWindow = new();
+                errorWindow.ErrorTextBlock.Text = ex.Message;
+                await errorWindow.ShowDialog(this);
             }
         }
     }
 
-    private async void OnCartridgeInfoClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private async void CartridgeInfo_Click(object? sender, RoutedEventArgs e)
     {
-        if (_cart == null)
+        CartridgeInfoWindow cartridgeInfoWindow = new();
+        cartridgeInfoWindow.UpdateCartridgeInfo(_cart?.GetInfo());
+        await cartridgeInfoWindow.ShowDialog(this);
+    }
+
+    private void Window_Loaded(object? sender, RoutedEventArgs e)
+    {
+        ScreenImage.Source = new WriteableBitmap(new(256, 240), new(96, 96), PixelFormat.Bgra8888, AlphaFormat.Unpremul);
+        PatternTable0Image.Source = new WriteableBitmap(new(128, 128), new(96, 96), PixelFormat.Bgra8888, AlphaFormat.Unpremul);
+        PatternTable1Image.Source = new WriteableBitmap(new(128, 128), new(96, 96), PixelFormat.Bgra8888, AlphaFormat.Unpremul);
+
+        _timer.Elapsed += (_, _) => Dispatcher.UIThread.Invoke(UpdateCpuInfo);
+        _timer.Start();
+    }
+
+    private void Window_KeyDown(object? sender, KeyEventArgs e)
+    {
+        _pressedKeys.Add(e.Key);
+        if (_cart == null) return;
+
+        if (e.Key == Key.R)
         {
-            var dialog = new Window
-            {
-                Title = "Cartridge Info",
-                Content = new TextBlock
-                {
-                    Text = "No cartridge loaded.",
-                    Margin = new Thickness(20),
-                    TextWrapping = TextWrapping.Wrap
-                },
-                SizeToContent = SizeToContent.WidthAndHeight,
-                WindowStartupLocation = WindowStartupLocation.CenterOwner
-            };
-            await dialog.ShowDialog(this);
-            return;
+            _nes.Cpu.Reset();
         }
-
-        var info = _cart.GetInfo();
-        var sb = new StringBuilder();
-        sb.AppendLine($"Mapper: {info.MapperName} (ID: {info.MapperId})");
-        sb.AppendLine($"PRG Banks: {info.PrgBanks}");
-        sb.AppendLine($"CHR Banks: {info.ChrBanks}");
-        sb.AppendLine($"Mirror Mode: {info.MirrorMode}");
-        sb.AppendLine($"Has Trainer: {info.HasTrainer}");
-        sb.AppendLine($"Valid: {info.IsValid}");
-        sb.AppendLine($"TV System: {info.TvSystem}");
-        sb.AppendLine($"File Format: {info.FileFormat}");
-
-        var infoDialog = new Window
+        else if (e.Key == Key.P)
         {
-            Title = "Cartridge Info",
-            Content = new TextBlock
+            _isEmuRunning = !_isEmuRunning;
+        }
+        else if (e.Key == Key.N)
+        {
+            ++_selectedPalette;
+            _selectedPalette &= 0x07;
+        }
+        else if (e.Key == Key.C)
+        {
+            do
             {
-                Text = sb.ToString(),
-                Margin = new Thickness(20),
-                TextWrapping = TextWrapping.Wrap,
-                FontFamily = new FontFamily("Consolas, Courier New, monospace")
-            },
-            SizeToContent = SizeToContent.WidthAndHeight,
-            WindowStartupLocation = WindowStartupLocation.CenterOwner
-        };
-        await infoDialog.ShowDialog(this);
+                _nes.Clock();
+            } while (!_nes.Cpu.Complete());
+
+            do
+            {
+                _nes.Clock();
+            } while (_nes.Cpu.Complete());
+        }
+        else if (e.Key == Key.F)
+        {
+            do
+            {
+                _nes.Clock();
+            } while (!_nes.Ppu.FrameComplete);
+
+            do
+            {
+                _nes.Clock();
+            } while (!_nes.Cpu.Complete());
+
+            _nes.Ppu.FrameComplete = false;
+        }
+    }
+
+    private void Window_KeyUp(object? sender, KeyEventArgs e)
+    {
+        _pressedKeys.Remove(e.Key);
+    }
+
+    private void AsmButton_Click(object? sender, RoutedEventArgs e)
+    {
+        OamButton.IsChecked = false;
+        AsmTextBlock.IsVisible = true;
+        OamTextBlock.IsVisible = false;
+    }
+
+    private void OamButton_Click(object? sender, RoutedEventArgs e)
+    {
+        AsmButton.IsChecked = false;
+        AsmTextBlock.IsVisible = false;
+        OamTextBlock.IsVisible = true;
     }
 }
