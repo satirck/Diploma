@@ -48,34 +48,63 @@ public partial class Ppu2C02
     {
         byte data = 0x00;
 
-        switch (addr)
+        if (bReadOnly)
         {
-            case 0x0000: // Control
-                break;
-            case 0x0001: // Mask
-                break;
-            case 0x0002: // Status
-                data = (byte)((_status.Reg & 0xE0) | (_ppuDataBuffer & 0x1F));
-                _status.VerticalBlank = false;
-                _addressLatch = 0;
-                break;
-            case 0x0003: // OAM Address
-                break;
-            case 0x0004: // OAM Data
-                data = OAMAsBytes[OamAddr];
-                break;
-            case 0x0005: // Scroll
-                break;
-            case 0x0006: // PPU Address
-                break;
-            case 0x0007: // PPU Data
-                data = _ppuDataBuffer;
-                _ppuDataBuffer = PpuRead(_vramAddr.Reg);
-
-                if (_vramAddr.Reg > 0x3F00) data = _ppuDataBuffer;
-                _vramAddr.Reg += (ushort)(_control.IncrementMode ? 32 : 1);
-                break;
+            switch (addr)
+            {
+                case 0x0000: // Control
+                    data = _control.Reg;
+                    break;
+                case 0x0001: // Mask
+                    data = _mask.Reg;
+                    break;
+                case 0x0002: // Status
+                    data = _status.Reg;
+                    break;
+                case 0x0003: // OAM Address
+                    break;
+                case 0x0004: // OAM Data
+                    break;
+                case 0x0005: // Scroll
+                    break;
+                case 0x0006: // PPU Address
+                    break;
+                case 0x0007: // PPU Data
+                    break;
+            }
         }
+        else
+        {
+            switch (addr)
+            {
+                case 0x0000: // Control
+                    break;
+                case 0x0001: // Mask
+                    break;
+                case 0x0002: // Status
+                    data = (byte)((_status.Reg & 0xE0) | (_ppuDataBuffer & 0x1F));
+                    _status.VerticalBlank = false;
+                    _addressLatch = 0;
+                    break;
+                case 0x0003: // OAM Address
+                    break;
+                case 0x0004: // OAM Data
+                    data = OAMAsBytes[OamAddr];
+                    break;
+                case 0x0005: // Scroll
+                    break;
+                case 0x0006: // PPU Address
+                    break;
+                case 0x0007: // PPU Data
+                    data = _ppuDataBuffer;
+                    _ppuDataBuffer = PpuRead(_vramAddr.Reg);
+
+                    if (_vramAddr.Reg > 0x3F00) data = _ppuDataBuffer;
+                    _vramAddr.Reg += (ushort)(_control.IncrementMode ? 32 : 1);
+                    break;
+            }
+        }
+        
 
         return data;
     }
@@ -118,7 +147,7 @@ public partial class Ppu2C02
             case 0x0006: // PPU Address
                 if (_addressLatch == 0)
                 {
-                    _tramAddr.Reg = (ushort)((_tramAddr.Reg & 0x00FF) | (data << 8));
+                    _tramAddr.Reg = (ushort)((_tramAddr.Reg & 0x00FF) | ((data & 0x3F) << 8));
                     _addressLatch = 1;
                 }
                 else
@@ -253,6 +282,11 @@ public partial class Ppu2C02
     {
         if (_scanline >= -1 && _scanline < 240)
         {
+            if (_scanline == 0 && _cycle == 0)
+            {
+                _cycle = 1;
+            }
+            
             if (-1 == _scanline && 1 == _cycle)
             {
                 _status.VerticalBlank = false;
@@ -318,6 +352,7 @@ public partial class Ppu2C02
 
             if (_cycle == 257)
             {
+                LoadBackgroundShifters();
                 TransferAddressX();
             }
 
@@ -331,14 +366,18 @@ public partial class Ppu2C02
                 _bgNextTileId = PpuRead((ushort)(0x2000 | (_vramAddr.Reg & 0x0FFF)));
             }
 
-            //FOREGROUND RENDERING
             if (_cycle == 257 && _scanline >= 0)
             {
                 Span<byte> bytes = MemoryMarshal.AsBytes<ObjectAttributeEntry>(_spriteScanline.AsSpan());
                 bytes.Fill(0xFF);
 
                 _spriteCount = 0;
-
+                for (var i = 0; i < 8; i++)
+                {
+                    _spriteShifterPatternLo[i] = 0;
+                    _spriteShifterPatternHi[i] = 0;
+                }
+                
                 byte nOAMEntry = 0;
                 _bSpriteZeroHitPossible = false;
                 while (nOAMEntry < 64 && _spriteCount < 9)
@@ -418,14 +457,14 @@ public partial class Ppu2C02
                                 sprite_pattern_addr_lo = (ushort)(
                                     ((_spriteScanline[i].ID & 0x01) << 12)
                                     | (((_spriteScanline[i].ID & 0xFE) + 1) << 4)
-                                    | (7 - (_scanline - _spriteScanline[i].Y) & 0x07));
+                                    | (7 - ((_scanline - _spriteScanline[i].Y) & 0x07)));
                             }
                             else
                             {
                                 sprite_pattern_addr_lo = (ushort)(
                                     ((_spriteScanline[i].ID & 0x01) << 12)
                                     | ((_spriteScanline[i].ID & 0xFE) << 4)
-                                    | (7 - (_scanline - _spriteScanline[i].Y) & 0x07));
+                                    | (7 - ((_scanline - _spriteScanline[i].Y) & 0x07)));
                             }
                         }
                     }
@@ -452,12 +491,15 @@ public partial class Ppu2C02
             // Post render
         }
 
-        if (241 == _scanline && 1 == _cycle)
+        if (_scanline >= 241 && _scanline < 261)
         {
-            _status.VerticalBlank = true;
-            if (_control.EnableNmi) Nmi = true;
+            if (241 == _scanline && 1 == _cycle)
+            {
+                _status.VerticalBlank = true;
+                if (_control.EnableNmi) Nmi = true;
+            }
         }
-
+        
         byte bg_pixel = 0x00;
         byte bg_palette = 0x00;
 
@@ -546,14 +588,14 @@ public partial class Ppu2C02
                     {
                         if (_cycle >= 9 && _cycle < 258)
                         {
-                            _status.SpriteZeroHit = false;
+                            _status.SpriteZeroHit = true;
                         }
                     }
                     else
                     {
                         if (_cycle >= 1 && _cycle < 258)
                         {
-                            _status.SpriteZeroHit = false;
+                            _status.SpriteZeroHit = true;
                         }
                     }
                 }

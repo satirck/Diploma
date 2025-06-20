@@ -171,91 +171,51 @@ public partial class Ppu2C02
 
     private void IncrementScrollX()
     {
-        // Только если включён рендеринг фона или спрайтов
         if (_mask.RenderBackground || _mask.RenderSprites)
         {
             if (_vramAddr.CoarseX == 31)
             {
-                // Дошли до конца строки тайлов — переходим в другой nametable по X
                 _vramAddr.CoarseX = 0;
                 _vramAddr.NametableX = !_vramAddr.NametableX;
             }
             else
             {
-                // Просто двигаемся вправо по тайлам
                 _vramAddr.CoarseX++;
             }
         }
     }
 
-    // ==============================================================================
-    // Increment the background tile "pointer" one scanline vertically
     private void IncrementScrollY()
     {
-        // Incrementing vertically is more complicated. The visible nametable
-        // is 32x30 tiles, but in memory there is enough room for 32x32 tiles.
-        // The bottom two rows of tiles are in fact not tiles at all, they
-        // contain the "attribute" information for the entire table. This is
-        // information that describes which palettes are used for different 
-        // regions of the nametable.
-        
-        // In addition, the NES doesnt scroll vertically in chunks of 8 pixels
-        // i.e. the height of a tile, it can perform fine scrolling by using
-        // the fine_y component of the register. This means an increment in Y
-        // first adjusts the fine offset, but may need to adjust the whole
-        // row offset, since fine_y is a value 0 to 7, and a row is 8 pixels high
-
-        // Ony if rendering is enabled
         if (_mask.RenderBackground || _mask.RenderSprites)
         {
-            // If possible, just increment the fine y offset
             if (_vramAddr.FineY < 7)
             {
                 _vramAddr.FineY++;
             }
             else
-            {
-                // If we have gone beyond the height of a row, we need to
-                // increment the row, potentially wrapping into neighbouring
-                // vertical nametables. Dont forget however, the bottom two rows
-                // do not contain tile information. The coarse y offset is used
-                // to identify which row of the nametable we want, and the fine
-                // y offset is the specific "scanline"
-
-                // Reset fine y offset
+            { 
                 _vramAddr.FineY = 0;
-
-                // Check if we need to swap vertical nametable targets
+                
                 if (_vramAddr.CoarseY == 29)
                 {
-                    // We do, so reset coarse y offset
                     _vramAddr.CoarseY = 0;
-                    // And flip the target nametable bit
                     _vramAddr.NametableY = !_vramAddr.NametableY;
                 }
                 else if (_vramAddr.CoarseY == 31)
                 {
-                    // In case the pointer is in the attribute memory, we
-                    // just wrap around the current nametable
                     _vramAddr.CoarseY = 0;
                 }
                 else
-                {
-                    // None of the above boundary/wrapping conditions apply
-                    // so just increment the coarse y offset
+                {   
                     _vramAddr.CoarseY++;
                 }
             }
         }
     }
 
-    // ==============================================================================
-    // Transfer the temporarily stored horizontal nametable access information
-    // into the "pointer". Note that fine x scrolling is not part of the "pointer"
-    // addressing mechanism
     private void TransferAddressX()
     {
-        // Ony if rendering is enabled
         if (_mask.RenderBackground || _mask.RenderSprites)
         {
             _vramAddr.NametableX = _tramAddr.NametableX;
@@ -263,13 +223,8 @@ public partial class Ppu2C02
         }
     }
 
-    // ==============================================================================
-    // Transfer the temporarily stored vertical nametable access information
-    // into the "pointer". Note that fine y scrolling is part of the "pointer"
-    // addressing mechanism
     private void TransferAddressY()
     {
-        // Ony if rendering is enabled
         if (_mask.RenderBackground || _mask.RenderSprites)
         {
             _vramAddr.FineY      = _tramAddr.FineY;
@@ -278,27 +233,11 @@ public partial class Ppu2C02
         }
     }
 
-
-    // ==============================================================================
-    // Prime the "in-effect" background tile shifters ready for outputting next
-    // 8 pixels in scanline.
     private void LoadBackgroundShifters()
     {	
-        // Each PPU update we calculate one pixel. These shifters shift 1 bit along
-        // feeding the pixel compositor with the binary information it needs. Its
-        // 16 bits wide, because the top 8 bits are the current 8 pixels being drawn
-        // and the bottom 8 bits are the next 8 pixels to be drawn. Naturally this means
-        // the required bit is always the MSB of the shifter. However, "fine x" scrolling
-        // plays a part in this too, whcih is seen later, so in fact we can choose
-        // any one of the top 8 bits.
         _bgShifterPatternLo = (ushort)((_bgShifterPatternLo & 0xFF00) | _bgNextTileLsb);
         _bgShifterPatternHi = (ushort)((_bgShifterPatternHi & 0xFF00) | _bgNextTileMsb);
 
-        // Attribute bits do not change per pixel, rather they change every 8 pixels
-        // but are synchronised with the pattern shifters for convenience, so here
-        // we take the bottom 2 bits of the attribute word which represent which 
-        // palette is being used for the current 8 pixels and the next 8 pixels, and 
-        // "inflate" them to 8 bit words.
         _bgShifterAttribLo  = (ushort)((_bgShifterAttribLo & 0xFF00) | ((_bgNextTileAttrib & 0b01) != 0 ? 0xFF : 0x00));
         _bgShifterAttribHi  = (ushort)((_bgShifterAttribHi & 0xFF00) | ((_bgNextTileAttrib & 0b10) != 0 ? 0xFF : 0x00));
     }
@@ -307,11 +246,9 @@ public partial class Ppu2C02
     {
         if (_mask.RenderBackground)
         {
-            // Shifting background tile pattern row
             _bgShifterPatternLo <<= 1;
             _bgShifterPatternHi <<= 1;
 
-            // Shifting palette attributes by 1
             _bgShifterAttribLo <<= 1;
             _bgShifterAttribHi <<= 1;
         }
