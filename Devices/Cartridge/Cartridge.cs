@@ -49,7 +49,9 @@ public class Cartridge
             if ((_header.Mapper2 & 0x0C) == 0x08) _nFileType = 2;
 
             if (_nFileType == 0)
-            {}
+            {
+                // Пока ничего не делаем
+            }
             else if (_nFileType == 1)
             {
                 _nPrgBanks = _header.PrgRomChunks;
@@ -57,20 +59,34 @@ public class Cartridge
                 _vPrgMemory.AddRange(reader.ReadBytes(_vPrgMemory.Capacity));
 
                 _nChrBanks = _header.ChrRomChunks;
-                if (_nChrBanks == 0) _vChrMemory = new List<byte>(8192);
-                else _vChrMemory.AddRange(reader.ReadBytes(_nChrBanks * 8192));
-                _vChrMemory.AddRange(reader.ReadBytes(_vChrMemory.Capacity));
+                if (_nChrBanks == 0)
+                {
+                    _vChrMemory = new List<byte>(Enumerable.Repeat((byte)0x00, 8192));
+                }
+                else
+                {
+                    _vChrMemory = new List<byte>(_nChrBanks * 8192);
+                    _vChrMemory.AddRange(reader.ReadBytes(_vChrMemory.Capacity));
+                }
             }
-            else if (_nFileType == 2) 
+            else if (_nFileType == 2)
             {
                 _nPrgBanks = (byte)(((_header.PrgRamSize & 0x07) << 8) | _header.PrgRomChunks);
                 _vPrgMemory = new List<byte>(_nPrgBanks * 16384);
                 _vPrgMemory.AddRange(reader.ReadBytes(_vPrgMemory.Capacity));
 
                 _nChrBanks = (byte)(((_header.PrgRamSize & 0x38) << 8) | _header.ChrRomChunks);
-                _vChrMemory = new List<byte>(_nChrBanks * 8192);
-                _vChrMemory.AddRange(reader.ReadBytes(_vChrMemory.Capacity));
+                if (_nChrBanks == 0)
+                {
+                    _vChrMemory = new List<byte>(Enumerable.Repeat((byte)0x00, 8192));
+                }
+                else
+                {
+                    _vChrMemory = new List<byte>(_nChrBanks * 8192);
+                    _vChrMemory.AddRange(reader.ReadBytes(_vChrMemory.Capacity));
+                }
             }
+
         }
         
         switch (_nMapperId)
