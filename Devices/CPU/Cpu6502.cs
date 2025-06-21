@@ -4,7 +4,7 @@ using Bus;
 
 public partial class Cpu6502
 {
-    private IBus _bus;
+    private Bus _bus;
 
     public readonly List<Instruction> Lookup = null!;
 
@@ -21,7 +21,7 @@ public partial class Cpu6502
     public byte Opcode { get; private set; } = 0x00;
     public byte Cycles { get; private set; } = 0;
 
-    public void ConnectBus(IBus bus)
+    public void ConnectBus(Bus bus)
     {
         _bus = bus;
     }

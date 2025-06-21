@@ -2,8 +2,6 @@
 Microsoft Visual Studio Solution File, Format Version 12.00
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Devices", "Devices\Devices.csproj", "{CE147646-E84A-4DE6-88F1-161753E5C84D}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Testing", "Testing\Testing.csproj", "{019968AA-A359-46D7-BFCE-2FDAC7E1B72B}"
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UI", "UI\UI.csproj", "{348E7167-69F1-47D5-A0D7-242EDA7CBA88}"
 EndProject
 Global
@@ -16,10 +14,6 @@ Global
 		{CE147646-E84A-4DE6-88F1-161753E5C84D}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{CE147646-E84A-4DE6-88F1-161753E5C84D}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{CE147646-E84A-4DE6-88F1-161753E5C84D}.Release|Any CPU.Build.0 = Release|Any CPU
-		{019968AA-A359-46D7-BFCE-2FDAC7E1B72B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{019968AA-A359-46D7-BFCE-2FDAC7E1B72B}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{019968AA-A359-46D7-BFCE-2FDAC7E1B72B}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{019968AA-A359-46D7-BFCE-2FDAC7E1B72B}.Release|Any CPU.Build.0 = Release|Any CPU
 		{348E7167-69F1-47D5-A0D7-242EDA7CBA88}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{348E7167-69F1-47D5-A0D7-242EDA7CBA88}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{348E7167-69F1-47D5-A0D7-242EDA7CBA88}.Release|Any CPU.ActiveCfg = Release|Any CPU

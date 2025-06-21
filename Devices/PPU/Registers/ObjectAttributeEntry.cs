@@ -1,5 +1,8 @@
+using System.Runtime.InteropServices;
+
 namespace Devices.PPU.Registers;
 
+[StructLayout(LayoutKind.Sequential)]
 public struct ObjectAttributeEntry
 {
     public byte Y;          // Y-позиция спрайта

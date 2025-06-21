@@ -7,14 +7,16 @@ using Avalonia.Media.Imaging;
 using Avalonia.Platform;
 using Avalonia.Platform.Storage;
 using Avalonia.Threading;
-using Devices.Bus.v1;
+using Devices.Bus;
 using Devices.Cartridge;
 using Devices.CPU;
 using Devices.PPU;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Text;
 using System.Timers;
+using Devices.Bus;
 
 namespace UI;
 
@@ -31,6 +33,14 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        
+        var logFilePath = "log.txt";
+        var fileStream = new FileStream(logFilePath, FileMode.Create, FileAccess.Write);
+        var streamWriter = new StreamWriter(fileStream)
+        {
+            AutoFlush = true
+        };
+        Console.SetOut(streamWriter);
     }
 
     private void UpdateRegisters()

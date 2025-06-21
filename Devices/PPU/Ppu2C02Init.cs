@@ -218,8 +218,7 @@ public partial class Ppu2C02
     {
         if (_mask.RenderBackground || _mask.RenderSprites)
         {
-            _vramAddr.NametableX = _tramAddr.NametableX;
-            _vramAddr.CoarseX    = _tramAddr.CoarseX;
+            _vramAddr.Reg = (ushort)((_vramAddr.Reg & 0xFBE0) | (_tramAddr.Reg & 0x041F));
         }
     }
 

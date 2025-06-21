@@ -115,8 +115,7 @@ public partial class Ppu2C02
         {
             case 0x0000: // Control
                 _control.Reg = data;
-                _tramAddr.NametableX = _control.NametableX;
-                _tramAddr.NametableY = _control.NametableY;
+                _tramAddr.Reg = (ushort)((_tramAddr.Reg & 0xF3FF) | ((data & 0x03) << 10));
                 break;
             case 0x0001: // Mask
                 _mask.Reg = data;
@@ -182,27 +181,26 @@ public partial class Ppu2C02
         else if (addr is >= 0x2000 and <= 0x3EFF)
         {
             addr &= 0x0FFF;
-
             if (_cart.GetMirror() == Mirror.Vertical)
             {
-                if (addr >= 0x0000 && addr <= 0x03FF)
+                if (addr is >= 0x0000 and <= 0x03FF) // Nametable 0
                     data = _tblName[0][addr & 0x03FF];
-                if (addr >= 0x0400 && addr <= 0x07FF)
+                else if (addr is >= 0x0400 and <= 0x07FF) // Nametable 1
                     data = _tblName[1][addr & 0x03FF];
-                if (addr >= 0x0800 && addr <= 0x0BFF)
+                else if (addr is >= 0x0800 and <= 0x0BFF) // Nametable 2 (mirror of 0)
                     data = _tblName[0][addr & 0x03FF];
-                if (addr >= 0x0C00 && addr <= 0x0FFF)
+                else // Nametable 3 (mirror of 1)
                     data = _tblName[1][addr & 0x03FF];
             }
             else if (_cart.GetMirror() == Mirror.Horizontal)
             {
-                if (addr >= 0x0000 && addr <= 0x03FF)
+                if (addr is >= 0x0000 and <= 0x03FF) // Nametable 0
                     data = _tblName[0][addr & 0x03FF];
-                if (addr >= 0x0400 && addr <= 0x07FF)
+                else if (addr is >= 0x0400 and <= 0x07FF) // Nametable 1 (mirror of 0)
                     data = _tblName[0][addr & 0x03FF];
-                if (addr >= 0x0800 && addr <= 0x0BFF)
+                else if (addr is >= 0x0800 and <= 0x0BFF) // Nametable 2
                     data = _tblName[1][addr & 0x03FF];
-                if (addr >= 0x0C00 && addr <= 0x0FFF)
+                else // Nametable 3 (mirror of 2)
                     data = _tblName[1][addr & 0x03FF];
             }
         }
@@ -238,29 +236,26 @@ public partial class Ppu2C02
         else if (addr is >= 0x2000 and <= 0x3EFF)
         {
             addr &= 0x0FFF;
-
             if (_cart.GetMirror() == Mirror.Vertical)
             {
-                // Vertical
-                if (addr >= 0x0000 && addr <= 0x03FF)
+                if (addr is >= 0x0000 and <= 0x03FF) // Nametable 0
                     _tblName[0][addr & 0x03FF] = data;
-                if (addr >= 0x0400 && addr <= 0x07FF)
+                else if (addr is >= 0x0400 and <= 0x07FF) // Nametable 1
                     _tblName[1][addr & 0x03FF] = data;
-                if (addr >= 0x0800 && addr <= 0x0BFF)
+                else if (addr is >= 0x0800 and <= 0x0BFF) // Nametable 2 (mirror of 0)
                     _tblName[0][addr & 0x03FF] = data;
-                if (addr >= 0x0C00 && addr <= 0x0FFF)
+                else // Nametable 3 (mirror of 1)
                     _tblName[1][addr & 0x03FF] = data;
             }
             else if (_cart.GetMirror() == Mirror.Horizontal)
             {
-                // Horizontal
-                if (addr >= 0x0000 && addr <= 0x03FF)
+                if (addr is >= 0x0000 and <= 0x03FF) // Nametable 0
                     _tblName[0][addr & 0x03FF] = data;
-                if (addr >= 0x0400 && addr <= 0x07FF)
+                else if (addr is >= 0x0400 and <= 0x07FF) // Nametable 1 (mirror of 0)
                     _tblName[0][addr & 0x03FF] = data;
-                if (addr >= 0x0800 && addr <= 0x0BFF)
+                else if (addr is >= 0x0800 and <= 0x0BFF) // Nametable 2
                     _tblName[1][addr & 0x03FF] = data;
-                if (addr >= 0x0C00 && addr <= 0x0FFF)
+                else // Nametable 3 (mirror of 2)
                     _tblName[1][addr & 0x03FF] = data;
             }
         }
@@ -372,39 +367,47 @@ public partial class Ppu2C02
                 bytes.Fill(0xFF);
 
                 _spriteCount = 0;
+                _status.SpriteOverflow = false;
+
                 for (var i = 0; i < 8; i++)
                 {
                     _spriteShifterPatternLo[i] = 0;
                     _spriteShifterPatternHi[i] = 0;
                 }
-                
+
                 byte nOAMEntry = 0;
                 _bSpriteZeroHitPossible = false;
-                while (nOAMEntry < 64 && _spriteCount < 9)
+
+                var spriteHeight = _control.SpriteSize ? 16 : 8;
+
+                while (nOAMEntry < 64)
                 {
-                    short diff = (short)((short)_scanline - (short)OAM[nOAMEntry].Y);
+                    var spriteY = OAM[nOAMEntry].Y;
 
-                    if (diff >= 0 && diff < (_control.SpriteSize ? 16 : 8))
+                    if (spriteY < 240 - spriteHeight)
                     {
-                        if (_spriteCount < 8)
+                        short diff = (short)(_scanline - spriteY);
+                        if (diff >= 0 && diff < spriteHeight)
                         {
-                            // Is this sprite sprite zero?
-                            if (nOAMEntry == 0)
+                            if (_spriteCount < 8)
                             {
-                                // It is, so its possible it may trigger a 
-                                // sprite zero hit when drawn
-                                _bSpriteZeroHitPossible = true;
+                                if (nOAMEntry == 0)
+                                {
+                                    _bSpriteZeroHitPossible = true;
+                                }
+                                _spriteScanline[_spriteCount] = OAM[nOAMEntry];
+                                _spriteCount++;
                             }
-
-                            _spriteScanline[_spriteCount] = OAM[nOAMEntry];
-                            _spriteCount++;
+                            else
+                            {
+                                _status.SpriteOverflow = true;
+                                break;
+                            }
                         }
                     }
 
                     nOAMEntry++;
                 }
-
-                _status.SpriteOverflow = (_spriteCount > 8);
             }
 
             if (_cycle == 340)
@@ -582,18 +585,18 @@ public partial class Ppu2C02
 
             if (_bSpriteZeroHitPossible && _bSpriteZeroBeingRendered)
             {
-                if (_mask.RenderBackground && _mask.RenderSprites)
+                if (_scanline < 240 && _cycle >= 1 && _cycle < 256)
                 {
-                    if (!(_mask.RenderBackgroundLeft || _mask.RenderSpritesLeft))
+                    if (_mask.RenderBackground && _mask.RenderSprites)
                     {
-                        if (_cycle >= 9 && _cycle < 258)
+                        if (_cycle < 9)
                         {
-                            _status.SpriteZeroHit = true;
+                            if (_mask.RenderSpritesLeft && _mask.RenderBackgroundLeft)
+                            {
+                                _status.SpriteZeroHit = true;
+                            }
                         }
-                    }
-                    else
-                    {
-                        if (_cycle >= 1 && _cycle < 258)
+                        else
                         {
                             _status.SpriteZeroHit = true;
                         }
@@ -643,6 +646,15 @@ public partial class Ppu2C02
                     for (int px = 0; px < 8; px++)
                         _sprScreen.SetPixel(x * 8 + px, y * 8 + py, color);
             }
+        }
+    }
+    
+    public void DebugPrintOAM()
+    {
+        for (int i = 0; i < 8; i++)
+        {
+            var oam = OAM[i];
+            Console.WriteLine($"{i:D2}: Y={oam.Y}, ID={oam.ID:X2}, AT={oam.Attribute:X2}, X={oam.X}");
         }
     }
 }
