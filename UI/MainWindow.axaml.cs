@@ -16,7 +16,6 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using System.Timers;
-using Devices.Bus;
 
 namespace UI;
 
@@ -33,7 +32,7 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
-        
+
         var logFilePath = "log.txt";
         var fileStream = new FileStream(logFilePath, FileMode.Create, FileAccess.Write);
         var streamWriter = new StreamWriter(fileStream)
@@ -227,7 +226,7 @@ public partial class MainWindow : Window
             catch (Exception ex)
             {
                 ErrorWindow errorWindow = new();
-                errorWindow.ErrorTextBlock.Text = ex.Message;
+                errorWindow.ErrorTextBlock.Text = $"Failed to load ROM: {ex.Message}";
                 await errorWindow.ShowDialog(this);
             }
         }

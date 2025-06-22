@@ -3,15 +3,14 @@
         x:Class="UI.ErrorWindow"
         Title="Error"
 		MinWidth="250"
+		MaxWidth="600"
 		CanResize="False"
 		SizeToContent="WidthAndHeight"
 		WindowStartupLocation="CenterScreen"
         FontSize="14"
         FontFamily="{StaticResource CourierPrime}"
         Background="#202020">
-	<StackPanel Margin="10"
-				Orientation="Horizontal">
-		<TextBlock Text="Failed to load ROM: " Foreground="#C0C0C0"/>
-		<TextBlock Name="ErrorTextBlock"/>
-	</StackPanel>
+	<TextBlock Name="ErrorTextBlock"
+			   Margin="10"
+			   TextWrapping="Wrap"/>
 </Window>
