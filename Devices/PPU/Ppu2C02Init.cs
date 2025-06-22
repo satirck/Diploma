@@ -1,5 +1,6 @@
 using System.Runtime.InteropServices;
 using Devices.PPU.Registers;
+using System.IO;
 
 namespace Devices.PPU;
 
@@ -157,6 +158,143 @@ public partial class Ppu2C02
         _control.Reg = 0x00;
         _vramAddr.Reg = 0x0000;
         _tramAddr.Reg = 0x0000;
+    }
+
+    // Методы для сохранения/загрузки состояния
+    public void SaveState(BinaryWriter writer)
+    {
+        // Сохраняем основные переменные состояния
+        writer.Write(_scanline);
+        writer.Write(_cycle);
+        writer.Write(_status.Reg);
+        writer.Write(_mask.Reg);
+        writer.Write(_control.Reg);
+        writer.Write(_vramAddr.Reg);
+        writer.Write(_tramAddr.Reg);
+        writer.Write(OamAddr);
+        writer.Write(_spriteCount);
+        writer.Write(_fineX);
+        writer.Write(_addressLatch);
+        writer.Write(_ppuDataBuffer);
+        writer.Write(_bSpriteZeroHitPossible);
+        writer.Write(_bSpriteZeroBeingRendered);
+        writer.Write(FrameComplete);
+        writer.Write(Nmi);
+
+        // Сохраняем массивы данных
+        writer.Write(_spriteShifterPatternLo);
+        writer.Write(_spriteShifterPatternHi);
+        writer.Write(_tblPalette);
+        
+        // Сохраняем двумерные массивы
+        for (int i = 0; i < 2; i++)
+        {
+            writer.Write(_tblName[i]);
+        }
+        
+        for (int i = 0; i < 2; i++)
+        {
+            for (int j = 0; j < 4096; j++)
+            {
+                writer.Write(_tblPattern[i, j]);
+            }
+        }
+
+        // Сохраняем OAM
+        for (int i = 0; i < 64; i++)
+        {
+            writer.Write(OAM[i].Y);
+            writer.Write(OAM[i].ID);
+            writer.Write(OAM[i].Attribute);
+            writer.Write(OAM[i].X);
+        }
+
+        // Сохраняем sprite scanline
+        for (int i = 0; i < 8; i++)
+        {
+            writer.Write(_spriteScanline[i].Y);
+            writer.Write(_spriteScanline[i].ID);
+            writer.Write(_spriteScanline[i].Attribute);
+            writer.Write(_spriteScanline[i].X);
+        }
+
+        // Сохраняем background rendering данные
+        writer.Write(_bgNextTileId);
+        writer.Write(_bgNextTileAttrib);
+        writer.Write(_bgNextTileLsb);
+        writer.Write(_bgNextTileMsb);
+        writer.Write(_bgShifterPatternLo);
+        writer.Write(_bgShifterPatternHi);
+        writer.Write(_bgShifterAttribLo);
+        writer.Write(_bgShifterAttribHi);
+    }
+
+    public void LoadState(BinaryReader reader)
+    {
+        // Загружаем основные переменные состояния
+        _scanline = reader.ReadInt16();
+        _cycle = reader.ReadInt16();
+        _status.Reg = reader.ReadByte();
+        _mask.Reg = reader.ReadByte();
+        _control.Reg = reader.ReadByte();
+        _vramAddr.Reg = reader.ReadUInt16();
+        _tramAddr.Reg = reader.ReadUInt16();
+        OamAddr = reader.ReadByte();
+        _spriteCount = reader.ReadByte();
+        _fineX = reader.ReadByte();
+        _addressLatch = reader.ReadByte();
+        _ppuDataBuffer = reader.ReadByte();
+        _bSpriteZeroHitPossible = reader.ReadBoolean();
+        _bSpriteZeroBeingRendered = reader.ReadBoolean();
+        FrameComplete = reader.ReadBoolean();
+        Nmi = reader.ReadBoolean();
+
+        // Загружаем массивы данных
+        _spriteShifterPatternLo = reader.ReadBytes(8);
+        _spriteShifterPatternHi = reader.ReadBytes(8);
+        _tblPalette = reader.ReadBytes(32);
+        
+        // Загружаем двумерные массивы
+        for (int i = 0; i < 2; i++)
+        {
+            _tblName[i] = reader.ReadBytes(1024);
+        }
+        
+        for (int i = 0; i < 2; i++)
+        {
+            for (int j = 0; j < 4096; j++)
+            {
+                _tblPattern[i, j] = reader.ReadByte();
+            }
+        }
+
+        // Загружаем OAM
+        for (int i = 0; i < 64; i++)
+        {
+            OAM[i].Y = reader.ReadByte();
+            OAM[i].ID = reader.ReadByte();
+            OAM[i].Attribute = reader.ReadByte();
+            OAM[i].X = reader.ReadByte();
+        }
+
+        // Загружаем sprite scanline
+        for (int i = 0; i < 8; i++)
+        {
+            _spriteScanline[i].Y = reader.ReadByte();
+            _spriteScanline[i].ID = reader.ReadByte();
+            _spriteScanline[i].Attribute = reader.ReadByte();
+            _spriteScanline[i].X = reader.ReadByte();
+        }
+
+        // Загружаем background rendering данные
+        _bgNextTileId = reader.ReadByte();
+        _bgNextTileAttrib = reader.ReadByte();
+        _bgNextTileLsb = reader.ReadByte();
+        _bgNextTileMsb = reader.ReadByte();
+        _bgShifterPatternLo = reader.ReadUInt16();
+        _bgShifterPatternHi = reader.ReadUInt16();
+        _bgShifterAttribLo = reader.ReadUInt16();
+        _bgShifterAttribHi = reader.ReadUInt16();
     }
     
     public Sprite GetScreen()

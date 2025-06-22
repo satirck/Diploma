@@ -1,4 +1,5 @@
 namespace Devices.Mapper.Impl;
+using System.IO;
 
 public class Mapper002(byte prgBanks, byte chrBanks) : Mapper(prgBanks, chrBanks)
 {
@@ -59,5 +60,17 @@ public class Mapper002(byte prgBanks, byte chrBanks) : Mapper(prgBanks, chrBanks
     public override void Reset()
     {
         _prgBank = 0;
+    }
+
+    public override void SaveState(BinaryWriter writer)
+    {
+        base.SaveState(writer);
+        writer.Write(_prgBank);
+    }
+
+    public override void LoadState(BinaryReader reader)
+    {
+        base.LoadState(reader);
+        _prgBank = reader.ReadByte();
     }
 } 

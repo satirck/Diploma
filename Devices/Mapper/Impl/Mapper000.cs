@@ -1,4 +1,5 @@
 namespace Devices.Mapper.Impl;
+using System.IO;
 
 public class Mapper000(byte prgBanks, byte chrBanks) : Mapper(prgBanks, chrBanks)
 {
@@ -48,5 +49,18 @@ public class Mapper000(byte prgBanks, byte chrBanks) : Mapper(prgBanks, chrBanks
     public new void Reset()
     {
         
+    }
+
+    // Mapper000 не имеет состояния для сохранения, но реализуем методы для совместимости
+    public override void SaveState(BinaryWriter writer)
+    {
+        base.SaveState(writer);
+        // Mapper000 не имеет дополнительного состояния
+    }
+
+    public override void LoadState(BinaryReader reader)
+    {
+        base.LoadState(reader);
+        // Mapper000 не имеет дополнительного состояния
     }
 }

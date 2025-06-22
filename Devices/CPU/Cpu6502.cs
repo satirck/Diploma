@@ -1,6 +1,7 @@
 namespace Devices.CPU;
 
 using Bus;
+using System.IO;
 
 public partial class Cpu6502
 {
@@ -66,5 +67,38 @@ public partial class Cpu6502
         {
             Status = (byte)(Status & ~(byte)f);
         }
+    }
+
+    // Методы для сохранения/загрузки состояния
+    public void SaveState(BinaryWriter writer)
+    {
+        writer.Write(A);
+        writer.Write(X);
+        writer.Write(Y);
+        writer.Write(Stkp);
+        writer.Write(Pc);
+        writer.Write(Status);
+        writer.Write(Fetched);
+        writer.Write(Temp);
+        writer.Write(AddrAbs);
+        writer.Write(AddRel);
+        writer.Write(Opcode);
+        writer.Write(Cycles);
+    }
+
+    public void LoadState(BinaryReader reader)
+    {
+        A = reader.ReadByte();
+        X = reader.ReadByte();
+        Y = reader.ReadByte();
+        Stkp = reader.ReadByte();
+        Pc = reader.ReadUInt16();
+        Status = reader.ReadByte();
+        Fetched = reader.ReadByte();
+        Temp = reader.ReadUInt16();
+        AddrAbs = reader.ReadUInt16();
+        AddRel = reader.ReadUInt16();
+        Opcode = reader.ReadByte();
+        Cycles = reader.ReadByte();
     }
 }

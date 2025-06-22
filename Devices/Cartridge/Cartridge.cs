@@ -212,6 +212,70 @@ public class Cartridge
         return info;
     }
 
+    // Методы для сохранения/загрузки состояния
+    public void SaveState(BinaryWriter writer)
+    {
+        // Сохраняем основные параметры картриджа
+        writer.Write(_nMapperId);
+        writer.Write(_nPrgBanks);
+        writer.Write(_nChrBanks);
+        writer.Write(_nFileType);
+        writer.Write(_bImageValid);
+        writer.Write((byte)_mirror);
+        
+        // Сохраняем память PRG и CHR
+        writer.Write(_vPrgMemory.Count);
+        writer.Write(_vPrgMemory.ToArray());
+        writer.Write(_vChrMemory.Count);
+        writer.Write(_vChrMemory.ToArray());
+        
+        // Сохраняем состояние маппера
+        if (_mapper != null)
+        {
+            writer.Write(true);
+            writer.Write(_nMapperId); // ID маппера для проверки при загрузке
+            _mapper.SaveState(writer);
+        }
+        else
+        {
+            writer.Write(false);
+        }
+    }
+
+    public void LoadState(BinaryReader reader)
+    {
+        // Загружаем основные параметры картриджа
+        _nMapperId = reader.ReadByte();
+        _nPrgBanks = reader.ReadByte();
+        _nChrBanks = reader.ReadByte();
+        _nFileType = reader.ReadByte();
+        _bImageValid = reader.ReadBoolean();
+        _mirror = (Mirror)reader.ReadByte();
+        
+        // Загружаем память PRG и CHR
+        int prgCount = reader.ReadInt32();
+        _vPrgMemory = new List<byte>(reader.ReadBytes(prgCount));
+        int chrCount = reader.ReadInt32();
+        _vChrMemory = new List<byte>(reader.ReadBytes(chrCount));
+        
+        // Загружаем состояние маппера
+        bool hasMapper = reader.ReadBoolean();
+        if (hasMapper)
+        {
+            byte mapperId = reader.ReadByte();
+            if (mapperId == _nMapperId && _mapper != null)
+            {
+                _mapper.LoadState(reader);
+            }
+            else
+            {
+                // Если ID маппера не совпадает, пропускаем данные
+                // Это может произойти при изменении версии эмулятора
+                throw new InvalidOperationException($"Mapper ID mismatch: expected {_nMapperId}, got {mapperId}");
+            }
+        }
+    }
+
     private struct Header
     {
         [MarshalAs(UnmanagedType.ByValArray, SizeConst = 4)]

@@ -1,7 +1,11 @@
-﻿// See https://aka.ms/new-console-template for more information
-
+using Devices.Bus;
 using Devices.Cartridge;
 
-String path = "/home/miki/Downloads/nestest.nes";
+namespace Devices;
 
-Cartridge cartridge = new Cartridge(path);
+class Program
+{
+    static void Main(string[] args)
+    {
+    }
+}

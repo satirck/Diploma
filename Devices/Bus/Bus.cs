@@ -1,5 +1,6 @@
 using Devices.CPU;
 using Devices.PPU;
+using System.IO;
 
 namespace Devices.Bus;
 
@@ -48,6 +49,67 @@ public class Bus
         Ppu.Reset();
         
         _nSystemClockCounter = 0;
+    }
+
+    // Методы для сохранения/загрузки состояния
+    public void SaveState(string filename)
+    {
+        using var writer = new BinaryWriter(File.Open(filename, FileMode.Create));
+        
+        // Сохраняем версию формата сохранения
+        writer.Write("NES_SAVE_v1.0");
+        
+        // Сохраняем состояние Bus
+        writer.Write(_nSystemClockCounter);
+        writer.Write(_cpuRam);
+        writer.Write(Controller);
+        writer.Write(_controllerState);
+        writer.Write(_dmaPage);
+        writer.Write(_dmaAddr);
+        writer.Write(_dmaData);
+        writer.Write(_dmaTransfer);
+        writer.Write(_dmaDummy);
+        
+        // Сохраняем состояние CPU
+        Cpu.SaveState(writer);
+        
+        // Сохраняем состояние PPU
+        Ppu.SaveState(writer);
+        
+        // Сохраняем состояние картриджа
+        _cart.SaveState(writer);
+    }
+
+    public void LoadState(string filename)
+    {
+        using var reader = new BinaryReader(File.Open(filename, FileMode.Open));
+        
+        // Проверяем версию формата
+        string version = reader.ReadString();
+        if (version != "NES_SAVE_v1.0")
+        {
+            throw new InvalidOperationException($"Unsupported save format: {version}");
+        }
+        
+        // Загружаем состояние Bus
+        _nSystemClockCounter = reader.ReadUInt32();
+        _cpuRam = reader.ReadBytes(2048);
+        Controller = reader.ReadBytes(2);
+        _controllerState = reader.ReadBytes(2);
+        _dmaPage = reader.ReadByte();
+        _dmaAddr = reader.ReadByte();
+        _dmaData = reader.ReadByte();
+        _dmaTransfer = reader.ReadBoolean();
+        _dmaDummy = reader.ReadBoolean();
+        
+        // Загружаем состояние CPU
+        Cpu.LoadState(reader);
+        
+        // Загружаем состояние PPU
+        Ppu.LoadState(reader);
+        
+        // Загружаем состояние картриджа
+        _cart.LoadState(reader);
     }
 
     public void Clock()

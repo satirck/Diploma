@@ -1,4 +1,5 @@
 using Devices.PPU;
+using System.IO;
 
 namespace Devices.Mapper.Impl;
 
@@ -162,5 +163,33 @@ public class Mapper001(byte prgBanks, byte chrBanks) : Mapper(prgBanks, chrBanks
         _prgBank = 0x00;
         _chrBank0 = 0x00;
         _chrBank1 = 0x00;
+    }
+
+    public override void SaveState(BinaryWriter writer)
+    {
+        base.SaveState(writer);
+        
+        // Сохраняем состояние Mapper001
+        writer.Write(_loadRegister);
+        writer.Write(_loadRegisterCount);
+        writer.Write(_control);
+        writer.Write(_prgBank);
+        writer.Write(_chrBank0);
+        writer.Write(_chrBank1);
+        writer.Write(_prgRam);
+    }
+
+    public override void LoadState(BinaryReader reader)
+    {
+        base.LoadState(reader);
+        
+        // Загружаем состояние Mapper001
+        _loadRegister = reader.ReadByte();
+        _loadRegisterCount = reader.ReadByte();
+        _control = reader.ReadByte();
+        _prgBank = reader.ReadByte();
+        _chrBank0 = reader.ReadByte();
+        _chrBank1 = reader.ReadByte();
+        _prgRam = reader.ReadBytes(0x2000);
     }
 } 

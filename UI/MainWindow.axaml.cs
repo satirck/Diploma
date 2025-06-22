@@ -240,6 +240,70 @@ public partial class MainWindow : Window
         await cartridgeInfoWindow.ShowDialog(this);
     }
 
+    private async void SaveState_Click(object? sender, RoutedEventArgs e)
+    {
+        if (_cart == null)
+        {
+            ErrorWindow errorWindow = new();
+            errorWindow.ErrorTextBlock.Text = "No cartridge loaded. Please load a ROM first.";
+            await errorWindow.ShowDialog(this);
+            return;
+        }
+
+        IStorageFile? file = await StorageProvider.SaveFilePickerAsync(new()
+        {
+            Title = "Save State",
+            DefaultExtension = ".sav",
+            FileTypeChoices = [new("NES Save State") { Patterns = ["*.sav"] }]
+        });
+
+        if (file != null)
+        {
+            try
+            {
+                _nes.SaveState(file.Path.LocalPath);
+            }
+            catch (Exception ex)
+            {
+                ErrorWindow errorWindow = new();
+                errorWindow.ErrorTextBlock.Text = $"Failed to save state: {ex.Message}";
+                await errorWindow.ShowDialog(this);
+            }
+        }
+    }
+
+    private async void LoadState_Click(object? sender, RoutedEventArgs e)
+    {
+        if (_cart == null)
+        {
+            ErrorWindow errorWindow = new();
+            errorWindow.ErrorTextBlock.Text = "No cartridge loaded. Please load a ROM first.";
+            await errorWindow.ShowDialog(this);
+            return;
+        }
+
+        IReadOnlyList<IStorageFile> files = await StorageProvider.OpenFilePickerAsync(new()
+        {
+            Title = "Load State",
+            AllowMultiple = false,
+            FileTypeFilter = [new("NES Save State") { Patterns = ["*.sav"] }]
+        });
+
+        if (files.Count > 0)
+        {
+            try
+            {
+                _nes.LoadState(files[0].Path.LocalPath);
+            }
+            catch (Exception ex)
+            {
+                ErrorWindow errorWindow = new();
+                errorWindow.ErrorTextBlock.Text = $"Failed to load state: {ex.Message}";
+                await errorWindow.ShowDialog(this);
+            }
+        }
+    }
+
     private void Window_Loaded(object? sender, RoutedEventArgs e)
     {
         ScreenImage.Source = new WriteableBitmap(new(256, 240), new(96, 96), PixelFormat.Bgra8888, AlphaFormat.Unpremul);

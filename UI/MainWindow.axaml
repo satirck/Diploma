@@ -24,6 +24,9 @@
 					<MenuItem Header="File" Focusable="False">
 						<MenuItem Header="Open" Click="FileOpen_Click"/>
 						<MenuItem Header="Cartridge Info..." Click="CartridgeInfo_Click"/>
+						<Separator/>
+						<MenuItem Header="Save State..." Click="SaveState_Click"/>
+						<MenuItem Header="Load State..." Click="LoadState_Click"/>
 					</MenuItem>
 				</Menu>
 			</Border>

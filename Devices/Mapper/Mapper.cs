@@ -1,4 +1,5 @@
 using Devices.PPU;
+using System.IO;
 
 namespace Devices.Mapper;
 
@@ -40,5 +41,20 @@ public abstract class Mapper
 
     public virtual void Scanline()
     {
+    }
+
+    // Методы для сохранения/загрузки состояния
+    public virtual void SaveState(BinaryWriter writer)
+    {
+        // Базовые данные маппера
+        writer.Write(NPrgBanks);
+        writer.Write(NChrBanks);
+    }
+
+    public virtual void LoadState(BinaryReader reader)
+    {
+        // Базовые данные маппера
+        NPrgBanks = reader.ReadByte();
+        NChrBanks = reader.ReadByte();
     }
 }
